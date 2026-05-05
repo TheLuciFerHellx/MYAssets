@@ -1,0 +1,2 @@
+# MYAssets
+For game use
