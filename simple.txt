@@ -1,0 +1,111 @@
+using UnityEngine;
+
+public class SafeAreaHandler : MonoBehaviour
+{
+    RectTransform rectTransform;
+
+    void Start()
+    {
+        rectTransform = GetComponent<RectTransform>();
+        ApplySafeArea();
+    }
+
+    void ApplySafeArea()
+    {
+        Rect safeArea = Screen.safeArea;
+
+        Vector2 minAnchor = safeArea.position;
+        Vector2 maxAnchor = safeArea.position + safeArea.size;
+
+        minAnchor.x /= Screen.width;
+        minAnchor.y /= Screen.height;
+        maxAnchor.x /= Screen.width;
+        maxAnchor.y /= Screen.height;
+
+        rectTransform.anchorMin = minAnchor;
+        rectTransform.anchorMax = maxAnchor;
+    }
+}
+
+
+===================================================================
+
+using UnityEngine;
+using UnityEngine.UI;
+
+public class FakeLoader : MonoBehaviour
+{
+    public Image fillBar;
+    public RectTransform car;
+    public RectTransform passenger;
+    public Text percentText;
+
+    public float speed = 0.3f;
+
+    private float progress = 0f;
+    private float barWidth;
+
+    void Start()
+    {
+        barWidth = ((RectTransform)fillBar.transform).rect.width;
+    }
+
+    void Update()
+    {
+        if (progress >= 1f) return;
+
+        // Progress increase
+        progress += Time.deltaTime * speed;
+        progress = Mathf.Clamp01(progress);
+
+        // Fill bar
+        fillBar.fillAmount = progress;
+
+        // Car position
+        float xPos = progress * barWidth;
+
+        // Small bounce for car
+        float bounce = Mathf.Sin(Time.time * 10f) * 5f;
+        car.anchoredPosition = new Vector2(xPos, bounce);
+
+        // Passenger follow (normal)
+        float followOffset = 60f;
+        Vector2 targetPos = new Vector2(xPos - followOffset, 0);
+
+        // Funny catch near end 😄
+        if (progress > 0.9f)
+        {
+            targetPos = Vector2.Lerp(
+                passenger.anchoredPosition,
+                car.anchoredPosition - new Vector2(30, 0),
+                Time.deltaTime * 5f
+            );
+        }
+
+        // Add small shake for running feel
+        float shake = Mathf.Sin(Time.time * 15f) * 3f;
+        passenger.anchoredPosition = new Vector2(targetPos.x, shake);
+
+        // Percent text
+        percentText.text = Mathf.RoundToInt(progress * 100) + "%";
+
+        // DONE ✅
+        if (progress >= 1f)
+        {
+            OnLoadingComplete();
+        }
+    }
+
+    void OnLoadingComplete()
+    {
+        percentText.text = "100%";
+
+        // Disable loader after short delay
+        Invoke(nameof(HideLoader), 0.5f);
+    }
+
+    void HideLoader()
+    {
+        gameObject.SetActive(false); // hides whole loading UI
+    }
+}
