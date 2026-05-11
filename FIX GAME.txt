@@ -1,0 +1,360 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class SplashUI : UIBase
+{
+    public Slider loadingBar;
+
+    void OnEnable()
+    {
+        loadingBar.value = 0f;
+        StartCoroutine(FakeLoading());
+    }
+
+    IEnumerator FakeLoading()
+    {
+        float duration = 5f;
+        float timer = 0f;
+
+        while (timer < duration)
+        {
+            timer += Time.deltaTime;
+
+            // Smoothly move from 0 -> 1
+            loadingBar.value = Mathf.Lerp(0f, 1f, timer / duration);
+
+            yield return null;
+        }
+
+        loadingBar.value = 1f;
+    }
+}
+
+====================================================
+in UIMANGER
+ void Start()
+    {
+        screenDict = new Dictionary<UIScreenType, UIBase>();
+
+        foreach (var s in screens)
+        {
+            screenDict[s.type] = s.ui;
+            s.ui.Hide();
+        }
+
+        StartCoroutine(StartGame());
+    }
+
+    IEnumerator StartGame()
+    {
+        ShowScreen(UIScreenType.Splash);
+
+        yield return new WaitForSeconds(5f);
+
+        ShowScreen(UIScreenType.MainMenu);
+    }
+
+===============================================================
+
+infinityLevel
+
+1.Update LoadLevel()
+
+public void LoadLevel()
+{
+    LevelData currentLevel;
+
+    // Use handmade levels first
+    if (currentLevelIndex < allLevels.Count)
+    {
+        currentLevel = allLevels[currentLevelIndex];
+    }
+    else
+    {
+        // Generate random level
+        currentLevel = CreateRandomLevel(currentLevelIndex + 1);
+    }
+
+    carSpawner.currentLevelData = currentLevel;
+
+    Debug.Log("Now playing level: " + currentLevel.levelNumber);
+
+    LevelTxt.text = "Level - " + currentLevel.levelNumber;
+    LevelTxtOnmainScreen.text = "Level - " + currentLevel.levelNumber;
+
+    ParkingGameManager.Instance.ResetForNewLevel();
+
+    StartCoroutine(LevelLoadSequence());
+}
+
+2. Add Random Level Generator
+
+LevelData CreateRandomLevel(int levelNumber)
+{
+    LevelData level = ScriptableObject.CreateInstance<LevelData>();
+
+    level.levelNumber = levelNumber;
+
+    // Random cars between 3 and 9
+    level.carsToSpawn = Random.Range(3, 10);
+
+    return level;
+}   
+========================================================================
+
+POWER UPS
+
+```csharp id="c26g7z"
+#region POWERUPS
+
+// ==========================
+// 1. SHUFFLE CARS
+// ==========================
+public void ShuffleCars()
+{
+    List<Vector3> positions = new List<Vector3>();
+
+    foreach (CarMover car in spawnPassengers.TotalCarsSpawn)
+    {
+        if (car != null)
+        {
+            positions.Add(car.transform.position);
+        }
+    }
+
+    foreach (CarMover car in spawnPassengers.TotalCarsSpawn)
+    {
+        if (car == null) continue;
+
+        int randomIndex = Random.Range(0, positions.Count);
+
+        car.transform.position = positions[randomIndex];
+
+        positions.RemoveAt(randomIndex);
+    }
+
+    Debug.Log("Cars Shuffled");
+}
+
+
+
+// ==========================
+// 2. UNDO MOVE
+// ==========================
+
+// Save these variables at top of script
+private CarMover lastMovedCar;
+private Vector3 lastPosition;
+
+
+// Call this BEFORE moving any car
+public void SaveMove(CarMover car)
+{
+    lastMovedCar = car;
+    lastPosition = car.transform.position;
+}
+
+
+// Undo Button
+public void UndoMove()
+{
+    if (lastMovedCar == null) return;
+
+    lastMovedCar.transform.position = lastPosition;
+
+    Debug.Log("Move Undone");
+}
+
+
+
+// ==========================
+// 3. HINT
+// ==========================
+public void ShowHint()
+{
+    if (spawnPassengers.TotalCarsSpawn.Count == 0) return;
+
+    CarMover randomCar =
+        spawnPassengers.TotalCarsSpawn[
+            Random.Range(0, spawnPassengers.TotalCarsSpawn.Count)
+        ];
+
+    SpriteRenderer sr = randomCar.GetComponent<SpriteRenderer>();
+
+    StartCoroutine(HintEffect(sr));
+}
+
+
+IEnumerator HintEffect(SpriteRenderer sr)
+{
+    Color original = sr.color;
+
+    sr.color = Color.green;
+
+    yield return new WaitForSeconds(1f);
+
+    sr.color = original;
+}
+
+#endregion
+```
+
+# IMPORTANT FOR UNDO
+
+Before any car moves, call:
+
+```csharp
+LevelManager.Instance.SaveMove(this);
+```
+
+Example inside your `CarMover`:
+
+```csharp
+void MoveCar()
+{
+    LevelManager.Instance.SaveMove(this);
+
+    // your move code
+}
+```
+
+Now you have:
+
+✅ Shuffle
+✅ Undo
+✅ Hint
+
+All minimal and safe for your current system.
+=======================================================================
+JSON SAVE FILE
+
+If you want SUPER simple saving without real backend/server, then use Unity serialization + JSON file save locally.
+
+This is how most small games start.
+
+# Simple Save System
+
+Create script:
+
+```csharp id="fw14n1"
+using UnityEngine;
+using System.IO;
+
+public class SaveManager : MonoBehaviour
+{
+    [System.Serializable]
+    public class PlayerData
+    {
+        public string playerName;
+        public string password;
+        public int lastLevel;
+        public int coins;
+    }
+
+    string savePath;
+
+    void Start()
+    {
+        savePath = Application.persistentDataPath + "/save.json";
+    }
+
+
+    // =========================
+    // SAVE
+    // =========================
+    public void SaveGame()
+    {
+        PlayerData data = new PlayerData();
+
+        data.playerName = "Player";
+        data.password = "1234";
+        data.lastLevel = 8;
+        data.coins = 500;
+
+        string json = JsonUtility.ToJson(data, true);
+
+        File.WriteAllText(savePath, json);
+
+        Debug.Log("Game Saved");
+    }
+
+
+    // =========================
+    // LOAD
+    // =========================
+    public void LoadGame()
+    {
+        if (!File.Exists(savePath))
+        {
+            Debug.Log("No Save Found");
+            return;
+        }
+
+        string json = File.ReadAllText(savePath);
+
+        PlayerData data =
+            JsonUtility.FromJson<PlayerData>(json);
+
+        Debug.Log("Player Name: " + data.playerName);
+        Debug.Log("Level: " + data.lastLevel);
+        Debug.Log("Coins: " + data.coins);
+    }
+}
+```
+
+---
+
+# Example Saved File
+
+Unity automatically creates:
+
+```json id="2xjlqv"
+{
+  "playerName": "Player",
+  "password": "1234",
+  "lastLevel": 8,
+  "coins": 500
+}
+```
+
+---
+
+# Save Location
+
+### Windows
+
+```txt id="n4u5ho"
+C:/Users/YourName/AppData/LocalLow/CompanyName/GameName
+```
+
+### Android
+
+```txt id="3f3m1c"
+/storage/emulated/0/Android/data/yourgame
+```
+
+---
+
+# Use
+
+Connect buttons:
+
+```csharp id="87pj1z"
+SaveGame();
+LoadGame();
+```
+
+---
+
+# Why This Is Better For You Right Now
+
+✅ No backend
+✅ No Node.js
+✅ No database
+✅ Very easy
+✅ Real game-style save system
+✅ Works offline
+✅ Beginner friendly
+✅ Can later convert to cloud save easily
+
