@@ -1,0 +1,125 @@
+```csharp
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SpawnCars : MonoBehaviour
+{
+    public List<CarMover> carPrefabs;
+
+    public SpawnPassengers spawnPassengers;
+    public LevelData currentLevelData;
+
+    [Header("Grid Settings")]
+    public Transform gridCenter;
+
+    public int columns = 4;
+
+    public float spaceX = 3f;
+    public float spaceZ = 5f;
+
+    void Start()
+    {
+        SpawnCarAsPerLevelNeed();
+    }
+
+    public void SpawnCarAsPerLevelNeed()
+    {
+        if (currentLevelData == null) return;
+
+        int carsToSpawn = currentLevelData.carsToSpawn;
+
+        // Create all possible grid positions
+        List<Vector3> gridPositions = new List<Vector3>();
+
+        int rows = Mathf.CeilToInt((float)carsToSpawn / columns);
+
+        for (int row = 0; row < rows; row++)
+        {
+            for (int col = 0; col < columns; col++)
+            {
+                float x = (col - (columns - 1) / 2f) * spaceX;
+                float z = (row - (rows - 1) / 2f) * spaceZ;
+
+                Vector3 pos = gridCenter.position + new Vector3(x, 0, z);
+
+                gridPositions.Add(pos);
+            }
+        }
+
+        // Sort positions from center to outside
+        gridPositions.Sort((a, b) =>
+        {
+            float distA = Vector3.Distance(a, gridCenter.position);
+            float distB = Vector3.Distance(b, gridCenter.position);
+
+            return distA.CompareTo(distB);
+        });
+
+        // Spawn cars
+        for (int i = 0; i < carsToSpawn; i++)
+        {
+            Vector3 spawnPos = gridPositions[i];
+
+            int prefabIndex = Random.Range(0, carPrefabs.Count);
+
+            CarMover selectedPrefab = carPrefabs[prefabIndex];
+
+            // SAFE ROTATIONS
+            // No opposite facing cars
+            float[] safeRotations = { 0f, 90f };
+
+            float randomY = safeRotations[Random.Range(0, safeRotations.Length)];
+
+            Quaternion spawnRot = Quaternion.Euler(0, randomY, 0);
+
+            // GET FROM POOL
+            CarMover carMover = ObjectPool.Instance.GetCarFromPool(selectedPrefab);
+
+            if (carMover != null)
+            {
+                carMover.transform.position = spawnPos;
+                carMover.transform.rotation = spawnRot;
+
+                carMover.ResetCapacity();
+                carMover.ResetEnum();
+
+                carMover.gameObject.SetActive(true);
+
+                carMover.arrow.enabled = true;
+                carMover.totalPassengerTxt.enabled = false;
+            }
+            else
+            {
+                carMover = Instantiate(selectedPrefab, spawnPos, spawnRot);
+            }
+
+            spawnPassengers.TotalCarsSpawn.Add(carMover);
+        }
+    }
+}
+```
+
+Inspector setup:
+
+```text
+Grid Center  -> empty object in middle of parking area
+
+Columns      -> 4
+
+Space X      -> 3
+
+Space Z      -> 5
+```
+
+What this does:
+
+* Uses your `carsToSpawn` from `LevelData`
+* Spawns from center outward
+* No overlap
+* Grid based
+* Keeps pooling
+* Keeps LevelManager
+* Keeps all your current systems
+* Uses safe rotations only (`0` and `90`)
+* Prevents face-to-face deadlocks mostly like real Car Out games
