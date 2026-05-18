@@ -7,7 +7,7 @@ using UnityEngine;
 public class ParkingGameManager : MonoBehaviour
 {
     public static ParkingGameManager Instance;
-
+    
     // List of all passengers waiting
     public List<Passenger> waitingPassengers = new List<Passenger>();
     public List<ParkingSlotManger> AllParkingSlotManager = new List<ParkingSlotManger>();
@@ -21,8 +21,8 @@ public class ParkingGameManager : MonoBehaviour
     public bool isLevelLoading = true;
 
     public TextMeshProUGUI TotalPassengerCount;
-    private int lastPassengerCount = -1;
 
+    private bool isProcessingQueue = false;
 
     private void Awake()
     {
@@ -31,34 +31,32 @@ public class ParkingGameManager : MonoBehaviour
     }
     void Update()
     {
-        int currentCount = waitingPassengers.Count;
-        if (currentCount != lastPassengerCount)
+        //TotalPassengerCount.text = waitingPassengers.Count.ToString();
+        if (TotalPassengerCount != null)
         {
-            TotalPassengerCount.text = currentCount.ToString();
-            lastPassengerCount = currentCount;
+            TotalPassengerCount.text =  waitingPassengers.Count.ToString();
         }
-
-        for (int i = 0; i < currentCount; i++)  // to update passenger line 
+        for (int i = 0; i < waitingPassengers.Count; i++)  // to update passenger line 
         {
             Vector3 nextPos = lineStart + (Vector3.right * (i * stepSize));
-            
-            // Optimization: Only move if not already at target
-            if (Vector3.SqrMagnitude(waitingPassengers[i].transform.position - nextPos) > 0.001f)
-            {
-                waitingPassengers[i].transform.position = Vector3.MoveTowards(waitingPassengers[i].transform.position, nextPos, Time.deltaTime * walkSpeedOfPassengers);
-            }
+        
+        // Use MoveTowards or Lerp for smooth movement instead of "snapping"
+            waitingPassengers[i].transform.position = Vector3.MoveTowards(waitingPassengers[i].transform.position, nextPos, Time.deltaTime * walkSpeedOfPassengers );
         }
     
         if (gameOver || isLevelLoading) return;
 
         // Optimization: Win condition check (can also be moved to an event-based check)
-        if (currentCount == 0) 
+        if (waitingPassengers.Count == 0) 
         {
             gameOver = true;
             isLevelLoading = true;
-            // UnityEngine.Debug.Log("Level Complete - All passengers cleared!");
+            UnityEngine.Debug.Log("Level Complete - All passengers cleared!");
             SoundManager.Instance.PlaySound(SoundManager.SoundName.LevelComplete);
+            // SoundManager.Instance.PlaySound(SoundManager.SoundName.PopupOpen);
             StartCoroutine(showLevelCompletePopup());
+            // Time.timeScale=0;
+            // LevelManager.Instance.CompleteLevel(); //Loding Next Level On Complete
             return;
         }
     }
@@ -104,7 +102,7 @@ public class ParkingGameManager : MonoBehaviour
         //         waitingPassengers.RemoveAt(0);
         //         ObjectPool.Instance.AddToPool(p.gameObject); // add to pool
         //         // Destroy(p.gameObject, 0.1f); //insted of destroy
-                
+
         //         //==============================================================================
         //         // for (int i = 0; i < waitingPassengers.Count; i++) 
         //         // {
@@ -142,7 +140,11 @@ public class ParkingGameManager : MonoBehaviour
         //         break; 
         //     }
         // }
-        StartCoroutine(ProcessQueue());
+        //StartCoroutine(ProcessQueue());
+        if (!isProcessingQueue)
+        {
+            StartCoroutine(ProcessQueue());
+        }
     }
 
     // IEnumerator ProcessQueue()
@@ -212,6 +214,7 @@ public class ParkingGameManager : MonoBehaviour
 
     IEnumerator ProcessQueue() 
     {
+        isProcessingQueue = true;
         // Use a while loop but ensure we yield to prevent freezing the game
         while (waitingPassengers.Count > 0) {
             Passenger p = waitingPassengers[0];
@@ -232,7 +235,8 @@ public class ParkingGameManager : MonoBehaviour
                 // 1. Claim the seat immediately so other passengers don't "overfill" it
                 var car = matchingSlot.currentCar;
                 car.CapacityOfPassengers -= 1;
-                car.GetComponent<CarMover>().totalPassengerTxt.text = car.CapacityOfPassengers.ToString();
+                //car.GetComponent<CarMover>().totalPassengerTxt.text = car.CapacityOfPassengers.ToString();
+                car.totalPassengerTxt.text = car.CapacityOfPassengers.ToString();
                 
                 // Remove passenger from list so the next one in queue can start thinking
                 waitingPassengers.RemoveAt(0);
@@ -252,16 +256,21 @@ public class ParkingGameManager : MonoBehaviour
 
                 // 4. Handle Full Car
                 if (car.CapacityOfPassengers <= 0) {
+                    matchingSlot.ClearSlot(); 
                     car.carType = ColorOfCarAndPassengers.None;
                     car.DriveAway();
+
                     
+                    //yield return new WaitForSeconds(1f); 
                     // Clear the slot
                     // matchingSlot.isOccupied = false;
                     // matchingSlot.currentCar = null;
                     // matchingSlot.parkedCarType = ColorOfCarAndPassengers.None;
                 }
-            } else {
+            } 
+            else {
                 // No match for the front of the line
+                isProcessingQueue = false;
                 GameOver(); 
                 yield break; // Exit coroutine entirely 
             }
@@ -269,19 +278,40 @@ public class ParkingGameManager : MonoBehaviour
             // Small gap between processing the next passenger in queue
             yield return new WaitForSeconds(0.1f);
         }
+        isProcessingQueue = false;
     }
 
-    
+    public ParkingSlotManger FindEmptyParkingSlot()
+    {
+        foreach (var slotObj in AllParkingSlotManager)
+        {
+            ParkingSlotManger slot = slotObj.GetComponent<ParkingSlotManger>();
+            // if (slot != null && !slot.isOccupied && slot.isOccupied == false)
+            // {
+            //     return slotObj; // Return the first free slot we find
+            // }
+            if (slot != null && !slot.isOccupied && !slot.isReserved)
+            {
+                return slot; // Corrected: Return the component, not the GameObject
+            }
+        }
+        return null; // All spots are full 
+    }
 
     public void GameOver()
     {
-        if (gameOver) return;
+        // if (gameOver) return;
 
         // 1. Check if all spots are occupied
         bool allSpotsFull = true;
-        foreach (var slot in AllParkingSlotManager)
+        foreach (var slotObj in AllParkingSlotManager)
         {
-            if (slot != null && !slot.isOccupied)
+            // if (!slotObj.GetComponent<ParkingSlotManger>().isOccupied)
+            // {
+            //     allSpotsFull = false;
+            //     break;
+            // }
+             if (!slotObj.isOccupied || slotObj.currentCar == null)
             {
                 allSpotsFull = false;
                 break;
@@ -298,7 +328,7 @@ public class ParkingGameManager : MonoBehaviour
         }
 
         // 3. Lose Condition: Board full AND passengers still waiting
-        if (allSpotsFull && waitingPassengers.Count >= 0)
+        if (allSpotsFull && waitingPassengers.Count > 0)
         {
             gameOver = true;
             isLevelLoading = true;
