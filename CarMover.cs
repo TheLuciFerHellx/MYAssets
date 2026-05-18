@@ -35,6 +35,7 @@ public class CarMover : MonoBehaviour
     public void ResetCapacity() 
     {
         CapacityOfPassengers = thisCarCapacity;
+        isParked = false; // FIX: Reset this so pooled cars can be clicked again!
         // Reset any other visuals or logic here, like clearing passenger lists
     }
 
@@ -44,34 +45,92 @@ public class CarMover : MonoBehaviour
         Debug.Log("Car enum reset to: " + carType);
     }
 
-    private IEnumerator MoveRoutine() 
-    {
-        float sqrTargetDistance = 0.01f * 0.01f;
-        // While we haven't reached the target
-        while (Vector3.SqrMagnitude(transform.position - targetPosition) > sqrTargetDistance)
-        {
-            // 1. Handle Rotation
-            Vector3 direction = (targetPosition - transform.position).normalized;
-            direction.y = 0;
+    // private IEnumerator MoveRoutine() 
+    //{
+    //    // While we haven't reached the target
+    //    while (Vector3.Distance(transform.position, targetPosition) > 0.01f)
+    //    {
+    //        // 1. Handle Rotation
+    //        Vector3 direction = (targetPosition - transform.position).normalized;
+    //        direction.y = 0;
 
-            if (direction != Vector3.zero) 
+    //        if (direction != Vector3.zero) 
+    //        {
+    //            Quaternion targetRot = Quaternion.LookRotation(direction);
+    //            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 5f * Time.deltaTime);
+    //        }
+
+    //        // 2. Handle Position
+    //        transform.position = Vector3.MoveTowards(transform.position, targetPosition, (speed * 6) * Time.deltaTime);
+
+    //        // Wait for next frame
+    //        yield return null;
+    //    }
+
+    //    // 3. Final snap and reset
+    //    transform.position = targetPosition;
+    //    transform.rotation = Quaternion.Euler(0, 0, 0);
+    //    // moveCoroutine = null;
+    //}
+
+    private IEnumerator MoveRoutine()
+    {
+        // PART 1: Drive around the outer walls
+        while (true)
+        {
+            // Always move forward
+            transform.Translate(Vector3.forward * (speed * 6) * Time.deltaTime);
+
+            Ray ray = new Ray(transform.position, transform.forward);
+            RaycastHit hit;
+
+            // Only detect walls that are close (1.5 units away)
+            if (Physics.Raycast(ray, out hit, 5f))
             {
-                Quaternion targetRot = Quaternion.LookRotation(direction);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 5f * Time.deltaTime);
+                if (hit.collider.CompareTag("rightWall") || hit.collider.CompareTag("leftWall"))
+                {
+                    // Set rotation to face the Front (North)
+                    transform.rotation = Quaternion.Euler(0, 0, 0);
+                }
+                else if (hit.collider.CompareTag("backWall"))
+                {
+                    // If we hit the back, turn Right to drive towards the rightWall
+                    transform.rotation = Quaternion.Euler(0, 90f, 0);
+                }
+                else if (hit.collider.CompareTag("frontWall"))
+                {
+                    // We hit the front! Break out of this while loop to go to the slot
+                    break;
+                }
             }
 
-            // 2. Handle Position
-            transform.position = Vector3.MoveTowards(transform.position, targetPosition, (speed * 6) * Time.deltaTime);
-
-            // Wait for next frame
+            // Wait for the next frame before looping again
             yield return null;
         }
 
-        // 3. Final snap and reset
+        // PART 2: We hit the front wall, now drive to the parking slot!
+
+        // Smoothly turn to face the target slot
+        Vector3 direction = (targetPosition - transform.position).normalized;
+        direction.y = 0;
+        if (direction != Vector3.zero)
+        {
+            transform.rotation = Quaternion.LookRotation(direction);
+        }
+
+        // Keep moving until we reach the parking slot
+        while (Vector3.Distance(transform.position, targetPosition) > 0.05f)
+        {
+            transform.position = Vector3.MoveTowards(transform.position, targetPosition, (speed * 6) * Time.deltaTime);
+            yield return null;
+        }
+
+        // Safely snap into the final position
         transform.position = targetPosition;
-        transform.rotation = Quaternion.Euler(0, 0, 0);
-        // moveCoroutine = null;
+        transform.rotation = Quaternion.Euler(0, 0, 0); // Face straight in the slot
+        isMoving = false;
     }
+
 
     // void Update() 
     // {
@@ -84,7 +143,7 @@ public class CarMover : MonoBehaviour
     //     {
     //         transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), 5f * Time.deltaTime);
     //     }
-        
+
     //     transform.position = Vector3.MoveTowards(transform.position,targetPosition, (speed * 6) * Time.deltaTime);
     //     // transform.position = Vector3.Slerp(transform.position, targetPosition, 2 * Time.deltaTime); 
 
@@ -126,9 +185,9 @@ public class CarMover : MonoBehaviour
     //     //         transform.rotation = Quaternion.Euler(0, 0 ,0);
     //     //     }
     //     // }
-    
+
     // }
-    
+
 
     public void DriveAway()
     {

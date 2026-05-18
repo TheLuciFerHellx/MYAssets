@@ -9,16 +9,11 @@ public enum ColorOfCarAndPassengers { Red, Blue, Green, white, oranage, None}
 
 public class CarController : MonoBehaviour
 {
-    public List<GameObject> parkingSpot;
+    // public List<GameObject> parkingSpot;
     // private GameObject selectedCar;
     // public int speed = 20;
     public ParkingGameManager parkingGameManager;
-    private Camera mainCam;
-
-    void Awake()
-    {
-        mainCam = Camera.main;
-    }
+    // private int currentSpotIndex = 0;
 
     // Update is called once per frame
     void Update()
@@ -113,13 +108,16 @@ public class CarController : MonoBehaviour
 
     void HandleCarSelection()
     {
-        Ray ray = mainCam.ScreenPointToRay(Input.mousePosition);
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
 
         if (Physics.Raycast(ray, out hit))
         {
             if (hit.collider.CompareTag("car"))
             {
+                CarMover clickedMover = hit.collider.GetComponent<CarMover>();
+                if (clickedMover != null && clickedMover.isParked) return; // FIX: Prevent clicking already moving cars!
+
                 Carout obstacleDetector = hit.collider.GetComponent<Carout>();
                 
                 // NEW: Manually trigger the raycast check before deciding to move
@@ -130,17 +128,20 @@ public class CarController : MonoBehaviour
                     UnityEngine.Debug.Log("Cannot move: Car in front!");
                     obstacleDetector.DoTackle();
                     SoundManager.Instance.PlaySound(SoundManager.SoundName.CarDash);
+                    StartCoroutine(CrashJiggle());
                     return; 
                 }
 
-                ParkingSlotManger emptySlot = FindEmptyParkingSlot();
+                // ParkingSlotManger emptySlot = FindEmptyParkingSlot();
+                ParkingSlotManger emptySlot = parkingGameManager.FindEmptyParkingSlot();
 
                 if (emptySlot != null)
                 {
                     CarMover mover = hit.collider.GetComponent<CarMover>();
                     if (mover != null)
                     {
-                        emptySlot.isReserved = true; 
+                        emptySlot.isReserved = true;
+                        emptySlot.incomingCar = mover; // FIX: Link the car to the slot! 
                         mover.isParked = true;
                         
                         // This now starts the Coroutine we made earlier
@@ -157,21 +158,32 @@ public class CarController : MonoBehaviour
         }
     }
 
-
-    ParkingSlotManger FindEmptyParkingSlot()
+    System.Collections.IEnumerator CrashJiggle()
     {
-        foreach (GameObject slotObj in parkingSpot)
+        Vector3 orig = Camera.main.transform.localPosition;
+        for (int i = 0; i < 5; i++) // Jiggles 5 times quickly
         {
-            ParkingSlotManger slot = slotObj.GetComponent<ParkingSlotManger>();
-            // if (slot != null && !slot.isOccupied && slot.isOccupied == false)
-            // {
-            //     return slotObj; // Return the first free slot we find
-            // }
-            if (slot != null && !slot.isOccupied && !slot.isReserved)
-            {
-                return slot; // Corrected: Return the component, not the GameObject
-            }
+            Camera.main.transform.localPosition = orig + (Vector3)UnityEngine.Random.insideUnitCircle * 0.2f;
+            yield return new WaitForSeconds(0.03f); // Delay between shakes
         }
-        return null; // All spots are full 
+        Camera.main.transform.localPosition = orig; // Stops cleanly at original spot
     }
+
+
+    // ParkingSlotManger FindEmptyParkingSlot()
+    // {
+    //     foreach (GameObject slotObj in parkingSpot)
+    //     {
+    //         ParkingSlotManger slot = slotObj.GetComponent<ParkingSlotManger>();
+    //         // if (slot != null && !slot.isOccupied && slot.isOccupied == false)
+    //         // {
+    //         //     return slotObj; // Return the first free slot we find
+    //         // }
+    //         if (slot != null && !slot.isOccupied && !slot.isReserved)
+    //         {
+    //             return slot; // Corrected: Return the component, not the GameObject
+    //         }
+    //     }
+    //     return null; // All spots are full 
+    // }
 }
