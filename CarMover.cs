@@ -221,7 +221,7 @@
 
 //}
 
-
+//NOTE make sure you make gridldot list public on spawnCars
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Video;
