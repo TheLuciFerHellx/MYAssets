@@ -665,3 +665,541 @@ public class CarMover : MonoBehaviour
         });
     }
 }
+============================================actual Working Code=================================================
+using Unity.VisualScripting;
+using UnityEngine;
+using UnityEngine.Video;
+using DG.Tweening;
+using TMPro;
+using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
+
+public class CarMover : MonoBehaviour
+{
+    public ColorOfCarAndPassengers carType;
+    public ColorOfCarAndPassengers defaultCarType;
+
+    private Vector3 targetPosition;
+
+    public float speed = 35f;
+
+    private bool isMoving = false;
+
+    public int CapacityOfPassengers = 4;
+    public int thisCarCapacity;
+
+    public TextMeshProUGUI totalPassengerTxt;
+    public Image arrow;
+
+    public bool isParked = false;
+
+    [Header("Traffic")]
+    public float safetyDistance = 4f;
+
+    // =========================================================
+    // SET DESTINATION
+    // =========================================================
+
+    public void SetDestination(Vector3 target)
+    {
+        if (isMoving) return;
+
+        targetPosition = target;
+
+        isMoving = true;
+
+        StartCoroutine(MoveRoutine());
+    }
+
+    // =========================================================
+    // RESETS
+    // =========================================================
+
+    public void ResetCapacity()
+    {
+        CapacityOfPassengers = thisCarCapacity;
+
+        isParked = false;
+    }
+
+    public void ResetEnum()
+    {
+        carType = defaultCarType;
+
+        Debug.Log("Car enum reset to: " + carType);
+    }
+
+    // =========================================================
+    // MAIN MOVE
+    // =========================================================
+
+    private IEnumerator MoveRoutine()
+    {
+        Carout carout = GetComponent<Carout>();
+
+        if (carout == null)
+        {
+            yield break;
+        }
+
+        Vector2Int currentGrid =
+            carout.currentGridIndex;
+
+        // =====================================================
+        // SNAP TO CURRENT GRID CENTER
+        // =====================================================
+
+        var currentSlot =
+            SpawnCars.Instance.GetSlotAt(
+                currentGrid.x,
+                currentGrid.y);
+
+        // if (currentSlot != null)
+        // {
+        //     // Prevent hard snap unless really needed
+        //     if (Vector3.Distance(
+        //         transform.position,
+        //         currentSlot.WorldPosition) > 0.2f)
+        //     {
+        //         transform.position =
+        //             currentSlot.WorldPosition;
+        //     }
+        // }
+
+        //For Smooth Move Towards Last Grid Position
+        if (currentSlot != null)
+        {
+            while (Vector3.Distance(
+                transform.position,
+                currentSlot.WorldPosition) > 0.02f)
+            {
+                transform.position =
+                    Vector3.MoveTowards(
+                        transform.position,
+                        currentSlot.WorldPosition,
+                        speed * Time.deltaTime);
+
+                yield return null;
+            }
+
+            transform.position =
+                currentSlot.WorldPosition;
+        }
+
+        // =====================================================
+        // GET DIRECTION
+        // =====================================================
+
+        Vector2Int dir =
+            GetDirectionFromAngle(
+                transform.eulerAngles.y);
+
+        // =====================================================
+        // GENERATE PATH
+        // =====================================================
+
+        List<Vector3> waypoints =
+            GeneratePath(currentGrid, dir);
+
+        // Final parking slot
+        waypoints.Add(targetPosition);
+
+        // =====================================================
+        // INITIAL ROTATION
+        // =====================================================
+
+        if (waypoints.Count > 0)
+        {
+            Vector3 firstDir =
+                (waypoints[0] - transform.position).normalized;
+
+            firstDir.y = 0;
+
+            if (firstDir != Vector3.zero)
+            {
+                transform.rotation =
+                    Quaternion.LookRotation(firstDir);
+            }
+        }
+
+        // =====================================================
+        // FOLLOW WAYPOINTS
+        // =====================================================
+
+        for (int i = 0; i < waypoints.Count; i++)
+        {
+            Vector3 wp = waypoints[i];
+
+            // =================================================
+            // MOVE FIRST
+            // =================================================
+
+            while (Vector3.Distance(transform.position, wp) > 0.001f)
+            {
+                transform.position =
+                    Vector3.MoveTowards(
+                        transform.position,
+                        wp,
+                        speed * Time.deltaTime);
+
+                yield return null;
+            }
+
+            // PERFECT SNAP
+            transform.position = wp;
+
+            // =================================================
+            // THEN ROTATE
+            // =================================================
+
+            if (i < waypoints.Count - 1)
+            {
+                Vector3 nextDir =
+                    (waypoints[i + 1] - transform.position).normalized;
+
+                nextDir.y = 0;
+
+                if (nextDir != Vector3.zero)
+                {
+                    transform.rotation =
+                        Quaternion.LookRotation(nextDir);
+                }
+            }
+        }
+
+        // =====================================================
+        // FINAL PARK SNAP
+        // =====================================================
+
+        transform.position = targetPosition;
+
+        transform.rotation =
+            Quaternion.Euler(0, 0, 0);
+
+        isMoving = false;
+
+        isParked = true;
+    }
+
+    // =========================================================
+    // GENERATE GRID PATH
+    // =========================================================
+
+    private List<Vector3> GeneratePath(
+        Vector2Int startGrid,
+        Vector2Int dir)
+    {
+        List<Vector3> path =
+            new List<Vector3>();
+
+        int maxCols =
+            SpawnCars.Instance.maxColumns;
+
+        int maxRows =
+            SpawnCars.Instance.maxRows;
+
+        int topRow =
+            maxRows - 1;
+
+        int centerX =
+            maxCols / 2;
+
+        Vector2Int current =
+            startGrid;
+
+        // =====================================================
+        // STEP 1
+        // MOVE TILL BORDER
+        // =====================================================
+
+        while (true)
+        {
+            Vector2Int next =
+                current + dir;
+
+            bool outside =
+                next.x < 0 ||
+                next.x >= maxCols ||
+                next.y < 0 ||
+                next.y >= maxRows;
+
+            if (outside)
+            {
+                break;
+            }
+
+            current = next;
+
+            var slot =
+                SpawnCars.Instance.GetSlotAt(
+                    current.x,
+                    current.y);
+
+            if (slot != null)
+            {
+                // Prevent duplicate waypoints
+                if (path.Count == 0 ||
+                    Vector3.Distance(
+                        path[path.Count - 1],
+                        slot.WorldPosition) > 0.01f)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+        }
+
+        // =====================================================
+        // ENSURE BORDER POSITION EXISTS
+        // =====================================================
+
+        var borderSlot =
+            SpawnCars.Instance.GetSlotAt(
+                current.x,
+                current.y);
+
+        if (borderSlot != null)
+        {
+            if (path.Count == 0 ||
+                Vector3.Distance(
+                    path[path.Count - 1],
+                    borderSlot.WorldPosition) > 0.01f)
+            {
+                path.Add(borderSlot.WorldPosition);
+            }
+        }
+
+        // =====================================================
+        // STEP 2
+        // BORDER ROAD SYSTEM
+        // =====================================================
+
+        // LEFT BORDER
+        if (current.x == 0)
+        {
+            // Move UP to top row
+            for (int y = current.y + 1; y < maxRows; y++)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        0,
+                        y);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+
+            // Move toward TOP CENTER
+            for (int x = 1; x <= centerX; x++)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        x,
+                        topRow);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+        }
+
+        // RIGHT BORDER
+        else if (current.x == maxCols - 1)
+        {
+            // Move UP to top row
+            for (int y = current.y + 1; y < maxRows; y++)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        maxCols - 1,
+                        y);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+
+            // Move toward TOP CENTER
+            for (int x = maxCols - 2; x >= centerX; x--)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        x,
+                        topRow);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+        }
+
+        // BOTTOM BORDER
+        else if (current.y == 0)
+        {
+            // Move RIGHT on bottom road
+            for (int x = current.x + 1; x < maxCols; x++)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        x,
+                        0);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+
+            // Then UP on right road
+            for (int y = 1; y < maxRows; y++)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        maxCols - 1,
+                        y);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+
+            // Then move toward TOP CENTER
+            for (int x = maxCols - 2; x >= centerX; x--)
+            {
+                var slot =
+                    SpawnCars.Instance.GetSlotAt(
+                        x,
+                        topRow);
+
+                if (slot != null)
+                {
+                    path.Add(slot.WorldPosition);
+                }
+            }
+        }
+
+        return path;
+    }
+
+    // =========================================================
+    // DIRECTION FROM ANGLE
+    // =========================================================
+
+    private Vector2Int GetDirectionFromAngle(float angle)
+    {
+        angle =
+            Mathf.Repeat(
+                Mathf.Round(angle / 45f) * 45f,
+                360f);
+
+        switch ((int)angle)
+        {
+            case 0:
+                return new Vector2Int(0, 1);
+
+            case 45:
+                return new Vector2Int(1, 1);
+
+            case 90:
+                return new Vector2Int(1, 0);
+
+            case 135:
+                return new Vector2Int(1, -1);
+
+            case 180:
+                return new Vector2Int(0, -1);
+
+            case 225:
+                return new Vector2Int(-1, -1);
+
+            case 270:
+                return new Vector2Int(-1, 0);
+
+            case 315:
+                return new Vector2Int(-1, 1);
+        }
+
+        return Vector2Int.zero;
+    }
+
+    // =========================================================
+    // TRAFFIC CHECK
+    // =========================================================
+
+    private bool IsMovingCarAhead()
+    {
+        RaycastHit hit;
+
+        if (Physics.Raycast(
+            transform.position + Vector3.up * 0.5f,
+            transform.forward,
+            out hit,
+            safetyDistance))
+        {
+            if (hit.collider.CompareTag("car"))
+            {
+                if (hit.collider.gameObject == gameObject)
+                    return false;
+
+                CarMover other =
+                    hit.collider.GetComponent<CarMover>();
+
+                if (other != null && !other.isParked)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // =========================================================
+    // DRIVE AWAY
+    // =========================================================
+
+    public void DriveAway()
+    {
+        isMoving = false;
+
+        totalPassengerTxt.enabled = false;
+
+        arrow.enabled = false;
+
+        DG.Tweening.Sequence s = DOTween.Sequence();
+
+        // Move back
+        s.Append(
+            transform.DOMove(
+                -transform.forward * 7f,
+                0.001f).SetRelative());
+
+        // Wait
+        s.AppendInterval(0.1f);
+
+        // Turn right
+        s.Append(
+            transform.DORotate(
+                new Vector3(0, 90, 0),
+                0.2f));
+
+        // Drive away
+        s.Append(
+            transform.DOMove(
+                transform.right * 80f,
+                0.5f).SetRelative());
+
+        s.OnComplete(() =>
+        {
+            ObjectPool.Instance.AddToPool(gameObject);
+
+            isParked = false;
+        });
+    }
+}
