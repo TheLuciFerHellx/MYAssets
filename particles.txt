@@ -1,0 +1,63 @@
+Yes. The easiest way is to follow the official setup guide and then watch a quick YouTube walkthrough.
+
+### 1. Install UI Particle
+
+Open **Window → Package Manager** → **+** → **Add package from Git URL** and paste:
+
+```text
+https://github.com/mob-sakai/ParticleEffectForUGUI.git
+```
+
+Or add it to your `manifest.json` as:
+
+```json
+"com.coffee.ui-particle": "https://github.com/mob-sakai/ParticleEffectForUGUI.git"
+```
+
+This is the official installation method. ([GitHub][1])
+
+### 2. Create a UI Particle
+
+After installation:
+
+1. Right-click in Hierarchy.
+2. Select **UI → ParticleSystem**.
+3. Unity creates a GameObject with **UIParticle** + **ParticleSystem** already configured.
+4. Customize the particle settings like any normal Unity particle system. ([GitHub][1])
+
+### 3. Use Your Existing Particle Prefab
+
+If you already made a particle effect:
+
+1. Create **UI → ParticleSystem (Empty)**.
+2. Drag your existing particle prefab under it as a child.
+3. The UIParticle component will render it inside the Canvas. ([GitHub][1])
+
+### 4. Common Fixes
+
+If particles don't show:
+
+* Change the material shader to **UI/Additive** or **UI/Default**.
+* Increase the **Scale** value in the UIParticle component.
+* Try **Position Mode = Absolute**.
+* Make sure the particle object is inside the Canvas hierarchy. ([GitHub][1])
+
+### Official Documentation
+
+* [GitHub Repository (UI Particle)](https://github.com/mob-sakai/ParticleEffectForUGUI)
+* [Getting Started Guide](https://deepwiki.com/mob-sakai/ParticleEffectForUGUI/2-getting-started)
+
+### Video Tutorials
+
+Search YouTube for:
+
+* `mob sakai UIParticle tutorial`
+* `ParticleEffectForUGUI tutorial`
+* `Unity UI particles UIParticle`
+
+A direct YouTube search:
+[YouTube Search: UIParticle Tutorial](https://www.youtube.com/results?search_query=UIParticle+Unity+tutorial)
+
+If you're making a **reward popup**, **coin collection effect**, **button sparkle**, or **gacha summon UI**, I can show the exact hierarchy and settings that most mobile games use.
+
+[1]: https://github.com/mob-sakai/ParticleEffectForUGUI "https://github.com/mob-sakai/ParticleEffectForUGUI"
