@@ -1,0 +1,122 @@
+Edited walkthrough.md
+
+Here is the code that was added and where it was changed:
+
+### 1. `FloatingTextManager.cs`
+**File Location:** [praiseMessages.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/AdditionalFeatures/praiseMessages.cs)
+
+**Added Code:**
+```csharp
+    [Header("Combo Settings")]
+    [Tooltip("Time window in seconds to perform a combo (get the next car full) and show praise text.")]
+    public float comboDuration = 4f;
+    private float comboTimer = 0f;
+
+    void Update()
+    {
+        if (comboTimer > 0f)
+        {
+            comboTimer -= Time.deltaTime;
+        }
+    }
+
+    /// <summary>
+    /// Resets the combo timer (e.g. on level load/reset).
+    /// </summary>
+    public void ResetCombo()
+    {
+        comboTimer = 0f;
+    }
+```
+
+**Modified `ShowPraise` method:**
+```csharp
+    public void ShowPraise(Vector3 worldPosition)
+    {
+        if (floatingTextPrefab == null || worldCanvas == null) return;
+
+        // Check if combo timer is active before we update/reset it
+        bool showPraiseText = comboTimer > 0f;
+
+        // Start/reset the combo timer
+        comboTimer = comboDuration;
+
+        // If combo timer wasn't active (first car or timed out), do not show praise text
+        if (!showPraiseText) return;
+
+        // ... (rest of the original ShowPraise UI spawning code continues here)
+```
+
+---
+
+### 2. `ParkingGameManager.cs`
+**File Location:** [ParkingGameManager.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/ParkingGameManager.cs)
+
+**Added Code in `ResetForNewLevel`:**
+```csharp
+    public void ResetForNewLevel()
+    {
+        gameOver = false;
+        isLevelLoading = true;
+        waitingPassengers.Clear();
+        
+        // Added this line to reset combo when loading a new level/restarting
+        FloatingTextManager.Instance?.ResetCombo(); 
+    }
+```
+
+---
+
+All code changes and a detailed step-by-step verification plan have been saved to the [walkthrough.md](file:///C:/Users/ABHAYprajapati/.gemini/antigravity/brain/584ce253-9f15-4788-9b41-1673f57dbb0d/walkthrough.md) artifact.
+
+
+
+
+
+=============================================================================================
+
+
+The method `ShowPraise` is already called automatically in the game when a car is full!
+
+Here is where the method is **defined** and where it is **called**:
+
+### 1. Where it is Defined (The method itself)
+It is defined in the script **[praiseMessages.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/AdditionalFeatures/praiseMessages.cs)** (attached to the `FloatingTextManager` GameObject in the scene). 
+
+You only need to replace the definition inside this file with the new combo logic:
+```csharp
+public void ShowPraise(Vector3 worldPosition)
+{
+    if (floatingTextPrefab == null || worldCanvas == null) return;
+
+    // Check if combo timer is active
+    bool showPraiseText = comboTimer > 0f;
+
+    // Start/reset the combo timer
+    comboTimer = comboDuration;
+
+    // If timer wasn't active, don't show praise text
+    if (!showPraiseText) return;
+
+    // ... (rest of the spawning/animation code)
+}
+```
+
+---
+
+### 2. Where it is Called
+It is called in the script **[ParkingGameManager.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/ParkingGameManager.cs)** inside the `ProcessQueue()` coroutine (around line 356):
+
+```csharp
+if (car.CapacityOfPassengers <= 0) {
+    matchingSlot.ClearSlot(); 
+    car.carType = ColorOfCarAndPassengers.None;
+
+    // ✅ CALLS THE METHOD HERE WHEN CAR IS FULL
+    FloatingTextManager.Instance?.ShowPraise(car.transform.position);
+    
+    car.DriveAway();
+}
+```
+
+Because it is already called there, **you do not need to add any new calls**. The existing call will automatically use the new combo timer logic we added.
