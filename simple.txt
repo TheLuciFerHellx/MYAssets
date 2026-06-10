@@ -641,3 +641,293 @@ Avoid:
 
 Target:
 AAA mobile game studio quality UI designed by senior art directors from top-grossing mobile puzzle games.
+
+==================SHOP====================
+
+using System.Collections.Generic;
+using UnityEngine;
+using TMPro;
+
+public class ShopManager : MonoBehaviour
+{
+    public static ShopManager Instance;
+
+    public TextMeshProUGUI coinCountText;
+
+    private List<ShopItemCard> registeredCards = new List<ShopItemCard>();
+
+    private bool isProcessingPurchase;
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
+    private void OnEnable()
+    {
+        SaveData.OnDataChanged += OnSaveChanged;
+    }
+
+    private void OnDisable()
+    {
+        SaveData.OnDataChanged -= OnSaveChanged;
+    }
+
+    private void Start()
+    {
+        RefreshAllUI();
+    }
+
+    private void OnSaveChanged()
+    {
+        // RefreshAllUI();
+         StartCoroutine(RefreshNextFrame());
+    }
+
+    // ---------- REGISTER ----------
+    public void RegisterCard(ShopItemCard card)
+    {
+        if (card != null && !registeredCards.Contains(card))
+            registeredCards.Add(card);
+    }
+
+    public void UnregisterCard(ShopItemCard card)
+    {
+        if (card != null)
+            registeredCards.Remove(card);
+    }
+
+    // ---------- UI ----------
+    private void RefreshAllUI()
+    {
+        RefreshCoinDisplay();
+        RefreshAllCards();
+    }
+    private System.Collections.IEnumerator RefreshNextFrame()
+    {
+        yield return null; // wait 1 frame
+
+        RefreshCoinDisplay();
+        RefreshAllCards();
+    }
+
+    public void RefreshCoinDisplay()
+    {
+        if (coinCountText == null) return;
+        if (SaveData.Instance?.CurrentSave == null) return;
+
+        coinCountText.text = SaveData.Instance.CurrentSave.currency.ToString();
+    }
+
+    public void RefreshAllCards()
+    {
+        for (int i = registeredCards.Count - 1; i >= 0; i--)
+        {
+            if (registeredCards[i] == null)
+            {
+                registeredCards.RemoveAt(i);
+                continue;
+            }
+
+            registeredCards[i].RefreshUI();
+        }
+    }
+
+    // ---------- PURCHASE ----------
+    public bool TryPurchase(ShopItemCard card)
+    {
+        if (card == null || SaveData.Instance?.CurrentSave == null)
+            return false;
+
+        if (isProcessingPurchase)
+            return false;
+
+        int currentCoins = SaveData.Instance.CurrentSave.currency;
+        int cost = card.coinCost;
+
+        // ❌ EARLY EXIT BEFORE LOCK
+        if (currentCoins < cost)
+        {
+            card.PlayInsufficientFeedback();
+            return false;
+        }
+
+        isProcessingPurchase = true;
+
+        try
+        {
+            // ✅ SINGLE SOURCE OF TRUTH UPDATE
+            SaveData.Instance.CurrentSave.currency =
+                currentCoins - cost + card.coinsReward;
+
+            // POWERUPS
+            if (card.powerupRewards != null)
+            {
+                foreach (var reward in card.powerupRewards)
+                {
+                    if (reward == null) continue;
+
+                    switch (reward.powerupType)
+                    {
+                        case ShopItemCard.PowerupType.FillSlot:
+                            SaveData.Instance.CurrentSave.fillSlotCount += reward.amount;
+                            break;
+
+                        case ShopItemCard.PowerupType.Rearrange:
+                            SaveData.Instance.CurrentSave.rearrangeCount += reward.amount;
+                            break;
+
+                        case ShopItemCard.PowerupType.Helicopter:
+                            SaveData.Instance.CurrentSave.helicopterCount += reward.amount;
+                            break;
+                    }
+                }
+            }
+
+            // SAVE ONCE
+            SaveData.Instance.Save();
+
+            // IMPORTANT: trigger global refresh
+            
+
+            if (PowerUps.Instance != null)
+                PowerUps.Instance.LoadFromSave();
+
+            Debug.Log("PURCHASE SUCCESS: " + card.itemName);
+        }
+        finally
+        {
+            isProcessingPurchase = false;
+        }
+
+        return true;
+    }
+}
+
+----------------------------------------
+
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+using DG.Tweening;
+
+public class ShopItemCard : MonoBehaviour
+{
+    public enum PowerupType
+    {
+        FillSlot,
+        Rearrange,
+        Helicopter
+    }
+
+    [System.Serializable]
+    public class PowerupReward
+    {
+        public PowerupType powerupType;
+        public int amount = 1;
+    }
+
+    [Header("DATA")]
+    public string itemName;
+    public int coinCost;
+    public int coinsReward;
+    public List<PowerupReward> powerupRewards;
+
+    [Header("UI")]
+    public Button buyButton;
+    public TextMeshProUGUI costText;
+    public TextMeshProUGUI rewardDescriptionText;
+    public TextMeshProUGUI itemNameText;
+
+    private bool initialized;
+
+    private void Awake()
+    {
+        if (initialized) return;
+        initialized = true;
+
+        if (buyButton != null)
+        {
+            buyButton.onClick.RemoveAllListeners();
+            buyButton.onClick.AddListener(OnBuyClicked);
+        }
+    }
+
+    private void Start()
+    {
+        ShopManager.Instance?.RegisterCard(this);
+        RefreshUI();
+    }
+
+    private void OnDestroy()
+    {
+        ShopManager.Instance?.UnregisterCard(this);
+    }
+
+    public void OnBuyClicked()
+    {
+        ShopManager.Instance?.TryPurchase(this);
+    }
+
+    public void RefreshUI()
+    {
+        if (SaveData.Instance?.CurrentSave == null) return;
+
+        if (itemNameText != null)
+            itemNameText.text = itemName;
+
+        if (costText != null)
+            costText.text = "Rs. " + coinCost;
+
+        if (rewardDescriptionText != null)
+            rewardDescriptionText.text = BuildRewardText();
+
+        if (buyButton != null)
+            buyButton.interactable =
+                SaveData.Instance.CurrentSave.currency >= coinCost;
+    }
+
+    private string BuildRewardText()
+    {
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+
+        if (coinsReward > 0)
+            sb.Append("+" + coinsReward + " Coins");
+
+        if (powerupRewards != null)
+        {
+            foreach (var r in powerupRewards)
+            {
+                sb.AppendLine();
+
+                switch (r.powerupType)
+                {
+                    case PowerupType.FillSlot:
+                        sb.Append("+" + r.amount + " Fill Slot");
+                        break;
+
+                    case PowerupType.Rearrange:
+                        sb.Append("+" + r.amount + " Rearrange");
+                        break;
+
+                    case PowerupType.Helicopter:
+                        sb.Append("+" + r.amount + " Helicopter");
+                        break;
+                }
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    public void PlayInsufficientFeedback()
+    {
+        transform.DOShakePosition(0.3f, 10f);
+    }
+}
