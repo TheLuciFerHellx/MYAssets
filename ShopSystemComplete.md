@@ -1,41 +1,170 @@
-# 🛒 Complete Shop System Guide — Car OUT Jam Puzzle Game
+# ✅ Shop System — Final Fixed Version
 
-> **Written by:** Pro Unity Developer (20+ years)  
-> **Date:** June 2026  
-> **DO NOT modify existing scripts.** All new scripts are fully compatible with your save system, PowerUps.cs, and GameDataLoader.cs.
+> Scripts location: `Assets/Script/Shop/ShopManager.cs` and `Assets/Script/Shop/ShopItemCard.cs`
+> Also updated: `Assets/Script/UIManager/ShopPopup.cs`
 
 ---
 
-## 📦 What This System Gives You
+## 🐛 Bugs That Were Fixed
 
-| Feature | Description |
+| Bug | Root Cause | Fix |
+|---|---|---|
+| **Double reward / wrong coin count** | Old code called `AddCurrency()` multiple times. Each call triggers `Save()` → `OnDataChanged` → `LoadAllData()` mid-purchase, corrupting the total | Now ALL changes are written directly to `CurrentSave` fields first, then `Save()` is called **exactly ONCE** at the end |
+| **Powerups not updating** | Old code called `PowerUps.Instance.LoadFromSave()` but `PowerUps.Instance` only exists in the GameView scene. If shop is on Main Menu, it's null and silently does nothing | Powerup counts are written to `SaveData.CurrentSave` directly. `OnDataChanged` fires → `GameDataLoader.LoadAllData()` reads fresh values and updates HUD texts automatically — **no dependency on PowerUps.Instance** |
+| **Card registration timing** | Cards calling `ShopManager.Instance.RegisterCard()` in `Awake()` — but ShopManager's `Awake()` runs the same frame, so `Instance` could be null | Registration moved to `Start()` and `OnEnable()`. By `Start()`, all `Awake()` calls are finished and `Instance` is guaranteed to exist |
+| **Coins not showing in shop** | `shopCoinText` was not being refreshed when shop opened | `ShopPopup.ShowShopPopup()` now calls `ShopManager.Instance.OnShopOpened()` which calls `RefreshShopCoinDisplay()` + `RefreshAllCards()` immediately |
+
+---
+
+## 📁 Files Created / Modified inside the Project
+
+| File Path | Status in Project | Description |
+|---|---|---|
+| [Assets/Script/Shop/ShopManager.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/Shop/ShopManager.cs) | ✅ Created & Added | Singleton controller. Handles purchases and atomic saves. |
+| [Assets/Script/Shop/ShopItemCard.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/Shop/ShopItemCard.cs) | ✅ Created & Added | Attached to each card UI. Configures cost, rewards, and handles Buy click. |
+| [Assets/Script/UIManager/ShopPopup.cs](file:///c:/Users/ABHAYprajapati/Downloads/Car-OUT-jam-puzzle-Game-Grid/Car-OUT-jam-puzzle-Game-Grid/Assets/Script/UIManager/ShopPopup.cs) | ✅ Updated & Added | Refreshes the shop display immediately upon opening. |
+
+---
+
+## ⚙️ Unity Setup — Step by Step
+
+### Step 1 — Create the Shop folder & scripts
+
+Both scripts are already fully created and placed inside your Unity project at `Assets/Script/Shop/`. When you open Unity, it will auto-detect and compile them!
+
+---
+
+### Step 2 — ShopManager GameObject
+
+1. Inside your Shop popup hierarchy (in Canvas), create an **empty GameObject**
+2. Name it `ShopManager`
+3. Drag `ShopManager.cs` onto it
+4. In the Inspector, assign:
+
+| Inspector Field | What to drag |
 |---|---|
-| **Coin Packs** | Cards to buy coins (e.g. "Gold Pack = 500 coins") |
-| **Mega Packs** | Cards that give coins + powerups together (e.g. "Jumbo Pack = 300 coins + 2 FillSlot + 1 Heli") |
-| **Full Save Integration** | Purchases write directly to your existing `SaveData.cs` / `GameSaveData` |
-| **Dynamic Cards** | Each card is a prefab with a `ShopItemCard.cs` script. You set what it gives in the Inspector |
-| **ShopManager** | Central manager; cards register themselves — no hardcoding |
-| **PowerUps.cs Sync** | After purchase, `PowerUps.Instance.LoadFromSave()` is called automatically |
-| **GameDataLoader Sync** | `SaveData.OnDataChanged` fires automatically; all HUD texts update |
+| `Shop Coin Text` | The TMP text that shows player coins inside the shop |
 
 ---
 
-## 🗂️ Files To Create
+### Step 3 — Create Card GameObjects
+
+Each card is a UI GameObject. Typical layout:
 
 ```
-Assets/Script/Shop/
-    ShopManager.cs        ← Central shop controller (Singleton)
-    ShopItemCard.cs       ← Attach to every card prefab in Inspector
+CardGameObject  ← attach ShopItemCard.cs HERE
+├── Background (Image)
+├── ItemNameText (TMP)          → drag to: itemNameText
+├── RewardDescriptionText (TMP) → drag to: rewardDescriptionText
+├── CostText (TMP)              → drag to: costText
+└── BuyButton (Button)          → drag to: buyButton
 ```
 
-> That's it! Only 2 new scripts. Everything else wires in through your existing save/powerup system.
+**Attach `ShopItemCard.cs` to the ROOT of each card.**
 
 ---
 
-## 📄 SCRIPT 1: `ShopManager.cs`
+### Step 4 — Configure Each Card in Inspector
 
-**Path:** `Assets/Script/Shop/ShopManager.cs`
+#### 🟡 Gold Pack — Coins Only
 
+| Field | Value |
+|---|---|
+| Item Name | `Gold Pack` |
+| Card Type | `CoinPack` |
+| Coin Cost | `50` |
+| Coins Reward | `200` |
+| Powerup Rewards | *(leave list empty)* |
+
+---
+
+#### 💎 Jumbo Mega Pack — Coins + 2 Powerups
+
+| Field | Value |
+|---|---|
+| Item Name | `Jumbo Mega Pack` |
+| Card Type | `MegaPack` |
+| Coin Cost | `150` |
+| Coins Reward | `300` |
+| Powerup Rewards | **Add 2 entries:** |
+
+Powerup Rewards entries:
+
+| # | Powerup Type | Amount |
+|---|---|---|
+| 0 | `FillSlot` | `2` |
+| 1 | `Helicopter` | `1` |
+
+---
+
+#### 🔧 FillSlot Pack — Powerup Only
+
+| Field | Value |
+|---|---|
+| Item Name | `Fill Slot x3` |
+| Card Type | `PowerupOnly` |
+| Coin Cost | `80` |
+| Coins Reward | `0` |
+| Powerup Rewards | 1 entry: `FillSlot`, Amount `3` |
+
+---
+
+### Step 5 — Place Cards in Scroll View
+
+```
+ShopPanel
+└── ScrollView
+    └── Viewport
+        └── Content  ← Vertical Layout Group + Content Size Fitter
+            ├── GoldPackCard       ← ShopItemCard.cs attached
+            ├── JumboMegaPackCard  ← ShopItemCard.cs attached
+            └── FillSlotPackCard   ← ShopItemCard.cs attached
+```
+
+---
+
+### Step 6 — Wire the Open Button
+
+On your open-shop button: **On Click ()** → drag the GameObject that has `ShopPopup.cs` → select `ShopPopup.ShowShopPopup()`
+
+That's all. `ShowShopPopup()` now also calls `ShopManager.OnShopOpened()` automatically.
+
+---
+
+## 🔄 Complete Purchase Flow (No Bugs)
+
+```
+Player taps BUY
+        ↓
+ShopItemCard.OnBuyClicked()
+        ↓
+ShopManager.TryPurchase(card)
+        ↓
+playerCoins >= coinCost ?
+  NO  → card.PlayInsufficientFeedback()  [shake, nothing saved]
+  YES ↓
+        ↓
+CurrentSave.currency  -= cost           ← direct field write
+CurrentSave.currency  += coinsReward    ← direct field write  
+CurrentSave.fillSlotCount  += X         ← direct field write (if any)
+CurrentSave.rearrangeCount += X         ← direct field write (if any)
+CurrentSave.helicopterCount+= X         ← direct field write (if any)
+        ↓
+SaveData.Save()  ← called ONCE, writes JSON, fires OnDataChanged ONCE
+        ↓
+OnDataChanged fires:
+  ├── GameDataLoader.LoadAllData()   → updates coin HUD, powerup count HUD texts
+  ├── ShopManager.RefreshAllCards()  → updates all card buy buttons (enable/disable)
+  └── ShopManager.RefreshShopCoinDisplay() → updates coin text inside shop
+        ↓
+PowerUps.Instance.LoadFromSave()   ← called if in GameView (safe null check)
+```
+
+---
+
+## 📄 Complete Script Code
+
+### 1. ShopManager.cs
 ```csharp
 using System.Collections;
 using System.Collections.Generic;
@@ -44,30 +173,33 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// Central Shop Manager — Singleton.
-/// Handles opening/closing the shop popup and coin display.
-/// Each ShopItemCard registers itself; ShopManager just orchestrates.
+/// ShopManager — Singleton. Central purchase controller for the shop.
+///
+/// HOW IT WORKS:
+///   1. Player taps BUY on a ShopItemCard.
+///   2. ShopItemCard calls ShopManager.Instance.TryPurchase(this).
+///   3. ShopManager does ONE atomic operation: modifies CurrentSave directly, then calls Save() ONCE.
+///   4. SaveData.Save() fires OnDataChanged ONCE.
+///   5. OnDataChanged refreshes GameDataLoader (HUD coins + powerup texts) automatically.
+///   6. PowerUps.LoadFromSave() is also called if the instance exists (GameView scene).
+///   7. All shop card buttons refresh interactable state.
+///
+/// PLACE ON: An empty GameObject inside your ShopPopup (e.g. named "ShopManager").
 /// </summary>
 public class ShopManager : MonoBehaviour
 {
     public static ShopManager Instance;
 
-    [Header("Shop UI References")]
-    [Tooltip("Assign the root ShopPanel GameObject (the one you show/hide)")]
-    public GameObject shopPanel;
+    [Header("─── Coin Display Inside Shop ───")]
+    [Tooltip("TMP text that shows the player's current coin balance at the top of the shop")]
+    public TextMeshProUGUI shopCoinText;
 
-    [Tooltip("TMP text that shows the player's current coin count inside the shop")]
-    public TextMeshProUGUI coinCountText;
+    // All cards in the scene register here so we can refresh them
+    private readonly List<ShopItemCard> _registeredCards = new List<ShopItemCard>();
 
-    [Tooltip("(Optional) UIPopupAnimator for open/close animation — same as your other popups")]
-    public UIPopupAnimator anim;
-
-    // All cards in the scene register themselves here automatically
-    private List<ShopItemCard> registeredCards = new List<ShopItemCard>();
-
-    // ──────────────────────────────────────────────────────────────
-    // UNITY LIFECYCLE
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // LIFECYCLE
+    // ─────────────────────────────────────────────────────────────────────
 
     private void Awake()
     {
@@ -81,172 +213,149 @@ public class ShopManager : MonoBehaviour
 
     private void OnEnable()
     {
-        SaveData.OnDataChanged += RefreshCoinDisplay;
+        // Auto-refresh coin display whenever ANY save happens (level complete, daily reward, etc.)
+        SaveData.OnDataChanged += OnSaveDataChanged;
     }
 
     private void OnDisable()
     {
-        SaveData.OnDataChanged -= RefreshCoinDisplay;
+        SaveData.OnDataChanged -= OnSaveDataChanged;
     }
 
     private void Start()
     {
-        RefreshCoinDisplay();
+        RefreshShopCoinDisplay();
+        RefreshAllCards();
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // CARD REGISTRATION  (cards call this themselves in their Awake)
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // CARD REGISTRATION  (ShopItemCard calls these)
+    // ─────────────────────────────────────────────────────────────────────
 
     public void RegisterCard(ShopItemCard card)
     {
-        if (!registeredCards.Contains(card))
-            registeredCards.Add(card);
+        if (card != null && !_registeredCards.Contains(card))
+            _registeredCards.Add(card);
     }
 
     public void UnregisterCard(ShopItemCard card)
     {
-        registeredCards.Remove(card);
+        _registeredCards.Remove(card);
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // OPEN / CLOSE
-    // ──────────────────────────────────────────────────────────────
-
-    public void OpenShop()
-    {
-        if (SoundManager.Instance != null)
-        {
-            SoundManager.Instance.PlaySound(SoundManager.SoundName.Click);
-            SoundManager.Instance.PlaySound(SoundManager.SoundName.PopupOpen);
-        }
-
-        UIPopupManager.Instance.ShowPopup(UIPopupManager.UIPopupType.Shop);
-        Time.timeScale = 0f;
-
-        if (anim != null)
-            anim.Open();
-
-        RefreshCoinDisplay();
-        RefreshAllCards();
-    }
-
-    public void CloseShop()
-    {
-        if (SoundManager.Instance != null)
-        {
-            SoundManager.Instance.PlaySound(SoundManager.SoundName.Click);
-            SoundManager.Instance.PlaySound(SoundManager.SoundName.PopupClose);
-        }
-
-        Time.timeScale = 1f;
-
-        if (anim != null)
-            anim.Close();
-
-        StartCoroutine(CloseAfterAnim());
-    }
-
-    private IEnumerator CloseAfterAnim()
-    {
-        yield return new WaitForSecondsRealtime(0.5f);
-        UIPopupManager.Instance.ClosePopup();
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // PURCHASE HANDLER  (called by ShopItemCard when player taps Buy)
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // PURCHASE  — the ONLY place coins/powerups are modified
+    // ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Attempts to process a purchase for the given card.
-    /// Returns TRUE if purchase was successful.
+    /// Called by ShopItemCard when the player taps the buy button.
+    /// Returns true if the purchase was successful.
     /// </summary>
     public bool TryPurchase(ShopItemCard card)
     {
-        if (SaveData.Instance == null) return false;
+        if (SaveData.Instance == null)
+        {
+            Debug.LogError("[ShopManager] SaveData.Instance is null! Cannot purchase.");
+            return false;
+        }
 
         int playerCoins = SaveData.Instance.CurrentSave.currency;
         int cost        = card.coinCost;
 
-        // ── Not enough coins ──
+        // ── Not enough coins → shake the card and bail ──────────────────
         if (playerCoins < cost)
         {
-            Debug.LogWarning($"[ShopManager] Not enough coins! Have {playerCoins}, need {cost}");
-            card.PlayInsufficientFeedback(); // shake animation on the card
+            Debug.LogWarning($"[ShopManager] Need {cost} coins but player only has {playerCoins}.");
+            card.PlayInsufficientFeedback();
             return false;
         }
 
-        // ── Deduct cost ──
-        SaveData.Instance.AddCurrency(-cost);
+        // ── ATOMIC: modify CurrentSave directly, call Save() ONCE at end ─
+        // Step 1: deduct cost
+        SaveData.Instance.CurrentSave.currency -= cost;
 
-        // ── Add coins reward (Coin Pack / part of Mega Pack) ──
+        // Step 2: add coin reward (if any)
         if (card.coinsReward > 0)
-            SaveData.Instance.AddCurrency(card.coinsReward);
+            SaveData.Instance.CurrentSave.currency += card.coinsReward;
 
-        // ── Add powerup rewards ──
+        // Step 3: add powerup rewards (if any)
         foreach (var reward in card.powerupRewards)
         {
             switch (reward.powerupType)
             {
                 case ShopItemCard.PowerupType.FillSlot:
-                    int newFill = SaveData.Instance.CurrentSave.fillSlotCount + reward.amount;
-                    SaveData.Instance.SetFillSlotCount(newFill);
+                    SaveData.Instance.CurrentSave.fillSlotCount += reward.amount;
                     break;
 
                 case ShopItemCard.PowerupType.Rearrange:
-                    int newRearrange = SaveData.Instance.CurrentSave.rearrangeCount + reward.amount;
-                    SaveData.Instance.SetRearrangeCount(newRearrange);
+                    SaveData.Instance.CurrentSave.rearrangeCount += reward.amount;
                     break;
 
                 case ShopItemCard.PowerupType.Helicopter:
-                    int newHeli = SaveData.Instance.CurrentSave.helicopterCount + reward.amount;
-                    SaveData.Instance.SetHelicopterCount(newHeli);
+                    SaveData.Instance.CurrentSave.helicopterCount += reward.amount;
                     break;
             }
         }
 
-        // ── Persist everything ──
+        // Step 4: ONE Save() call — this writes to disk AND fires OnDataChanged ONCE
         SaveData.Instance.Save();
 
-        // ── Sync the in-game PowerUps HUD ──
+        // Step 5: sync PowerUps in-game HUD (only exists in GameView scene, safe if null)
         if (PowerUps.Instance != null)
             PowerUps.Instance.LoadFromSave();
 
-        // ── Refresh all shop cards ──
-        RefreshAllCards();
-        RefreshCoinDisplay();
-
-        Debug.Log($"[ShopManager] Purchased: {card.itemName}");
+        Debug.Log($"[ShopManager] Purchase OK: {card.itemName} | Cost:{cost} | CoinsRewarded:{card.coinsReward}");
         return true;
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // UI REFRESH
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // CALLED BY SaveData.OnDataChanged
+    // ─────────────────────────────────────────────────────────────────────
 
-    public void RefreshCoinDisplay()
+    private void OnSaveDataChanged()
     {
-        if (coinCountText != null && SaveData.Instance != null)
-            coinCountText.text = SaveData.Instance.CurrentSave.currency.ToString();
+        RefreshShopCoinDisplay();
+        RefreshAllCards();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // UI REFRESH
+    // ─────────────────────────────────────────────────────────────────────
+
+    public void RefreshShopCoinDisplay()
+    {
+        if (shopCoinText != null && SaveData.Instance != null)
+            shopCoinText.text = SaveData.Instance.CurrentSave.currency.ToString();
     }
 
     public void RefreshAllCards()
     {
-        foreach (var card in registeredCards)
+        for (int i = _registeredCards.Count - 1; i >= 0; i--)
         {
-            if (card != null)
-                card.RefreshUI();
+            if (_registeredCards[i] == null)
+                _registeredCards.RemoveAt(i);  // clean up destroyed cards
+            else
+                _registeredCards[i].RefreshUI();
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // OPEN / CLOSE  (called by your existing ShopPopup.cs buttons)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Call this from your open-shop button instead of or alongside ShopPopup.ShowShopPopup().
+    /// Refreshes everything immediately when the shop opens.
+    /// </summary>
+    public void OnShopOpened()
+    {
+        RefreshShopCoinDisplay();
+        RefreshAllCards();
     }
 }
 ```
 
----
-
-## 📄 SCRIPT 2: `ShopItemCard.cs`
-
-**Path:** `Assets/Script/Shop/ShopItemCard.cs`
-
+### 2. ShopItemCard.cs
 ```csharp
 using System.Collections;
 using System.Collections.Generic;
@@ -256,26 +365,28 @@ using TMPro;
 using DG.Tweening;
 
 /// <summary>
-/// Attach this to every Shop Card prefab/GameObject in your Shop popup.
+/// ShopItemCard — Attach ONE of these to EVERY card prefab/GameObject in the shop.
 ///
-/// CARD TYPES:
-///   CoinPack  — gives only coins (coinsReward > 0, no powerupRewards)
-///   MegaPack  — gives coins + powerups (coinsReward > 0, powerupRewards has entries)
-///   PowerupOnly — gives only powerups (coinsReward = 0, powerupRewards has entries)
+/// CARD TYPES (set in Inspector):
+///   CoinPack    → coinsReward > 0,  powerupRewards list is EMPTY
+///   MegaPack    → coinsReward > 0,  powerupRewards list has entries
+///   PowerupOnly → coinsReward = 0,  powerupRewards list has entries
 ///
-/// All configuration is done in the Inspector — fully dynamic!
+/// IMPORTANT: Do NOT call SaveData methods yourself here.
+///            Just configure the fields in the Inspector.
+///            ShopManager.TryPurchase() handles ALL the save logic.
 /// </summary>
 public class ShopItemCard : MonoBehaviour
 {
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
     // ENUMS
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
 
     public enum CardType
     {
-        CoinPack,    // Only coins
-        MegaPack,    // Coins + Powerups
-        PowerupOnly  // Only powerups (no coin reward)
+        CoinPack,     // Gives only coins (no powerups)
+        MegaPack,     // Gives coins + powerups
+        PowerupOnly   // Gives only powerups (no coin reward)
     }
 
     public enum PowerupType
@@ -285,76 +396,81 @@ public class ShopItemCard : MonoBehaviour
         Helicopter
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // POWERUP REWARD ENTRY  (one entry per powerup type in the pack)
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // POWERUP REWARD — one entry per powerup type you want in this pack
+    // ─────────────────────────────────────────────────────────────────────
 
     [System.Serializable]
     public class PowerupReward
     {
-        [Tooltip("Which powerup to add")]
+        [Tooltip("Which powerup to grant")]
         public PowerupType powerupType;
 
-        [Tooltip("How many of this powerup to add on purchase")]
+        [Tooltip("How many of this powerup to add")]
         public int amount = 1;
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // INSPECTOR FIELDS
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // INSPECTOR FIELDS — configure each card in Unity Inspector
+    // ─────────────────────────────────────────────────────────────────────
 
     [Header("─── Card Identity ───")]
-    [Tooltip("Display name shown on the card (e.g. 'Gold Pack', 'Jumbo Mega Pack')")]
+    [Tooltip("Display name shown on the card  e.g. 'Gold Pack' or 'Jumbo Mega Pack'")]
     public string itemName = "Shop Item";
 
     [Tooltip("What kind of card is this?")]
     public CardType cardType = CardType.CoinPack;
 
-    [Header("─── Cost ───")]
-    [Tooltip("How many coins the player must spend to buy this")]
+    [Header("─── Cost (what player PAYS) ───")]
+    [Tooltip("Coins the player must spend to buy this card")]
     public int coinCost = 100;
 
-    [Header("─── Coin Reward ───")]
-    [Tooltip("How many coins this card gives. Set 0 for PowerupOnly cards.")]
+    [Header("─── Coin Reward (what player GETS) ───")]
+    [Tooltip("Coins added to the player after purchase. Set 0 for PowerupOnly cards.")]
     public int coinsReward = 0;
 
     [Header("─── Powerup Rewards ───")]
-    [Tooltip("Leave empty for CoinPack. Add entries for MegaPack or PowerupOnly.")]
+    [Tooltip("Leave EMPTY for CoinPack. Add one entry per powerup type for MegaPack/PowerupOnly.")]
     public List<PowerupReward> powerupRewards = new List<PowerupReward>();
 
-    [Header("─── UI References ───")]
-    [Tooltip("The main buy button on this card")]
+    [Header("─── UI References (assign in Inspector) ───")]
+    [Tooltip("The BUY button on this card")]
     public Button buyButton;
 
-    [Tooltip("Shows the cost (e.g. '100 Coins')")]
+    [Tooltip("TMP text that shows the cost  e.g. '100 Coins'")]
     public TextMeshProUGUI costText;
 
-    [Tooltip("Shows what the player gets (e.g. '+500 Coins' or '+300 Coins +2 FillSlot')")]
+    [Tooltip("TMP text that auto-builds reward description  e.g. '+300 Coins\n+2 FillSlot'")]
     public TextMeshProUGUI rewardDescriptionText;
 
-    [Tooltip("(Optional) Item name label")]
+    [Tooltip("(Optional) TMP text showing the card's name")]
     public TextMeshProUGUI itemNameText;
 
-    [Tooltip("(Optional) Icon for this card")]
-    public Image itemIcon;
+    [Tooltip("(Optional) Icon image for this card")]
+    public Image itemIconImage;
 
-    // ──────────────────────────────────────────────────────────────
-    // UNITY LIFECYCLE
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // LIFECYCLE
+    // ─────────────────────────────────────────────────────────────────────
 
     private void Awake()
     {
-        // Register with ShopManager
-        if (ShopManager.Instance != null)
-            ShopManager.Instance.RegisterCard(this);
+        // Wire the buy button immediately — safe to do in Awake
+        if (buyButton != null)
+            buyButton.onClick.AddListener(OnBuyClicked);
+    }
+
+    private void Start()
+    {
+        // Register with ShopManager (by Start(), ShopManager.Instance is definitely ready)
+        TryRegister();
+        RefreshUI();
     }
 
     private void OnEnable()
     {
-        // Re-register if ShopManager was loaded after this card
-        if (ShopManager.Instance != null)
-            ShopManager.Instance.RegisterCard(this);
-
+        // Re-register every time the card/popup becomes active
+        TryRegister();
         RefreshUI();
     }
 
@@ -364,18 +480,15 @@ public class ShopItemCard : MonoBehaviour
             ShopManager.Instance.UnregisterCard(this);
     }
 
-    private void Start()
+    private void TryRegister()
     {
-        // Wire up the buy button
-        if (buyButton != null)
-            buyButton.onClick.AddListener(OnBuyClicked);
-
-        RefreshUI();
+        if (ShopManager.Instance != null)
+            ShopManager.Instance.RegisterCard(this);
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // BUY BUTTON HANDLER
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // BUY BUTTON
+    // ─────────────────────────────────────────────────────────────────────
 
     private void OnBuyClicked()
     {
@@ -383,45 +496,45 @@ public class ShopItemCard : MonoBehaviour
             ShopManager.Instance.TryPurchase(this);
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // UI REFRESH  (called by ShopManager whenever data changes)
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // UI REFRESH — called by ShopManager after every purchase / shop open
+    // ─────────────────────────────────────────────────────────────────────
 
     public void RefreshUI()
     {
-        // Item name
+        // Item name label
         if (itemNameText != null)
             itemNameText.text = itemName;
 
-        // Cost
+        // Cost label
         if (costText != null)
             costText.text = coinCost + " Coins";
 
-        // Reward description — build dynamically
+        // Reward description — auto-built from Inspector values
         if (rewardDescriptionText != null)
             rewardDescriptionText.text = BuildRewardDescription();
 
-        // Buy button interactable check
+        // Buy button: interactable only if player has enough coins
         if (buyButton != null && SaveData.Instance != null)
         {
             int playerCoins = SaveData.Instance.CurrentSave.currency;
-            buyButton.interactable = playerCoins >= coinCost;
+            buyButton.interactable = (playerCoins >= coinCost);
         }
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // BUILD REWARD TEXT  (auto-generates based on Inspector settings)
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // BUILD REWARD TEXT — fully dynamic, driven by Inspector values
+    // ─────────────────────────────────────────────────────────────────────
 
     private string BuildRewardDescription()
     {
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        var sb = new System.Text.StringBuilder();
 
-        // Coins reward
+        // Coin reward line
         if (coinsReward > 0)
             sb.Append($"+{coinsReward} Coins");
 
-        // Powerup rewards
+        // Powerup reward lines
         foreach (var reward in powerupRewards)
         {
             if (sb.Length > 0) sb.Append("\n");
@@ -440,252 +553,71 @@ public class ShopItemCard : MonoBehaviour
             }
         }
 
+        // Fallback if nothing is set
+        if (sb.Length == 0)
+            sb.Append("No Reward Set");
+
         return sb.ToString();
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // FEEDBACK ANIMATION  (shake card if not enough coins)
-    // ──────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────
+    // INSUFFICIENT COINS FEEDBACK — shake animation
+    // ─────────────────────────────────────────────────────────────────────
 
     public void PlayInsufficientFeedback()
     {
-        transform.DOShakePosition(0.4f, new Vector3(10f, 0f, 0f), 20, 90f);
+        // Shake only on X axis so it feels like a "no" shake
+        transform.DOShakePosition(0.4f, new Vector3(12f, 0f, 0f), 20, 90f, false, true);
     }
 }
 ```
 
----
-
-## ⚙️ Unity Setup Instructions
-
-### Step 1 — Create the Scripts
-
-1. In Unity, go to `Assets/Script/`
-2. Create a new folder: **`Shop`**
-3. Inside it, create two C# scripts:
-   - `ShopManager.cs` → paste Script 1 above
-   - `ShopItemCard.cs` → paste Script 2 above
-
----
-
-### Step 2 — ShopManager GameObject Setup
-
-1. In your Shop popup hierarchy (inside Canvas), create an **empty GameObject** named `ShopManager`
-2. Drag **`ShopManager.cs`** onto it
-3. In the Inspector, fill in:
-
-| Field | What to assign |
-|---|---|
-| `Shop Panel` | The root GameObject of your shop popup |
-| `Coin Count Text` | TMP text showing coin count inside the shop |
-| `Anim` | (Optional) The `UIPopupAnimator` component on the shop panel |
-
-> The `ShopPopup.cs` you already have can call `ShopManager.Instance.OpenShop()` and `ShopManager.Instance.CloseShop()` — or just keep using it as-is and let it control the UIPopupManager; both work together.
-
----
-
-### Step 3 — Create Shop Card Prefabs
-
-For each item you want to sell, create a UI card (Image + children). A typical card layout:
-
-```
-ShopCard (GameObject)
-├── Background (Image)
-├── ItemIcon (Image)                ← drag into ShopItemCard.itemIcon
-├── ItemNameText (TMP)              ← drag into ShopItemCard.itemNameText
-├── RewardDescriptionText (TMP)     ← drag into ShopItemCard.rewardDescriptionText
-├── CostText (TMP)                  ← drag into ShopItemCard.costText
-└── BuyButton (Button)              ← drag into ShopItemCard.buyButton
-```
-
-Attach `ShopItemCard.cs` to the root `ShopCard` GameObject.
-
----
-
-### Step 4 — Configure Each Card in the Inspector
-
-#### 🟡 Gold Pack (Coins Only)
-
-| Field | Value |
-|---|---|
-| Item Name | `Gold Pack` |
-| Card Type | `CoinPack` |
-| Coin Cost | `50` |
-| Coins Reward | `200` |
-| Powerup Rewards | *(empty list)* |
-
----
-
-#### 💎 Jumbo Mega Pack (Coins + 2 Powerups)
-
-| Field | Value |
-|---|---|
-| Item Name | `Jumbo Mega Pack` |
-| Card Type | `MegaPack` |
-| Coin Cost | `150` |
-| Coins Reward | `300` |
-| Powerup Rewards | Add **2 entries**: |
-
-**Powerup Rewards List for Jumbo Mega Pack:**
-
-| Index | Powerup Type | Amount |
-|---|---|---|
-| [0] | `FillSlot` | `2` |
-| [1] | `Helicopter` | `1` |
-
----
-
-#### ⭐ Diamond Mega Pack (Coins + Different Powerups)
-
-| Field | Value |
-|---|---|
-| Item Name | `Diamond Mega Pack` |
-| Card Type | `MegaPack` |
-| Coin Cost | `250` |
-| Coins Reward | `500` |
-| Powerup Rewards | Add entries as you like |
-
----
-
-#### 🔧 FillSlot Pack (Powerup Only)
-
-| Field | Value |
-|---|---|
-| Item Name | `Fill Slot x3` |
-| Card Type | `PowerupOnly` |
-| Coin Cost | `80` |
-| Coins Reward | `0` |
-| Powerup Rewards | 1 entry: `FillSlot`, Amount `3` |
-
----
-
-### Step 5 — Place Cards in the Shop Panel
-
-Put all your card GameObjects inside the Shop popup's **Content** object (inside a Scroll View with Vertical Layout Group). Unity Inspector example:
-
-```
-ShopPopup (GameObject)
-└── ShopPanel
-    ├── Header ("SHOP")
-    ├── CoinDisplay (TMP: shows player coins)
-    ├── CloseButton
-    └── ScrollView
-        └── Viewport
-            └── Content (Vertical Layout Group + Content Size Fitter)
-                ├── GoldPackCard       ← ShopItemCard attached
-                ├── JumboMegaPackCard  ← ShopItemCard attached
-                ├── DiamondMegaCard    ← ShopItemCard attached
-                └── FillSlotPackCard   ← ShopItemCard attached
-```
-
----
-
-### Step 6 — Wire the Open Button
-
-On any button in your MainMenu or HUD that should open the shop:
-
-- **On Click ()** → drag `ShopManager` GameObject → select `ShopManager.OpenShop()`
-
-OR, if you are using `ShopPopup.cs` already, replace the contents of `ShowShopPopup()` with:
-
+### 3. ShopPopup.cs
 ```csharp
-public void ShowShopPopup()
+using System.Collections;
+using UnityEngine;
+
+/// <summary>
+/// ShopPopup — handles the open/close animation of the Shop popup.
+/// Also calls ShopManager.OnShopOpened() so all cards and coin text refresh instantly.
+/// </summary>
+public class ShopPopup : MonoBehaviour
 {
-    SoundManager.Instance.PlaySound(SoundManager.SoundName.Click);
-    SoundManager.Instance.PlaySound(SoundManager.SoundName.PopupOpen);
-    UIPopupManager.Instance.ShowPopup(UIPopupManager.UIPopupType.Shop);
-    Time.timeScale = 0;
-    if (anim != null) anim.Open();
-    ShopManager.Instance.RefreshAllCards();
-    ShopManager.Instance.RefreshCoinDisplay();
+    public UIPopupAnimator anim;
+
+    public void ShowShopPopup()
+    {
+        SoundManager.Instance.PlaySound(SoundManager.SoundName.Click);
+        SoundManager.Instance.PlaySound(SoundManager.SoundName.PopupOpen);
+
+        UIPopupManager.Instance.ShowPopup(UIPopupManager.UIPopupType.Shop);
+        Time.timeScale = 0;
+
+        if (anim != null)
+            anim.Open();
+
+        // Refresh coin display + all card buttons immediately when shop opens
+        if (ShopManager.Instance != null)
+            ShopManager.Instance.OnShopOpened();
+    }
+
+    public void CloseShopPopup()
+    {
+        SoundManager.Instance.PlaySound(SoundManager.SoundName.Click);
+        SoundManager.Instance.PlaySound(SoundManager.SoundName.PopupClose);
+
+        Time.timeScale = 1;
+
+        if (anim != null)
+            anim.Close();
+
+        StartCoroutine(CloseAfterAnim());
+    }
+
+    private IEnumerator CloseAfterAnim()
+    {
+        yield return new WaitForSecondsRealtime(0.5f);
+        UIPopupManager.Instance.ClosePopup();
+    }
 }
 ```
-
----
-
-## 🔄 How Data Flows (Full Purchase Flow)
-
-```
-Player taps BUY on a card
-        ↓
-ShopItemCard.OnBuyClicked()
-        ↓
-ShopManager.TryPurchase(card)
-        ↓
-Check: playerCoins >= card.coinCost?
-   ├─ NO  → card.PlayInsufficientFeedback() (shake)
-   └─ YES ↓
-        ↓
-SaveData.AddCurrency(-cost)          ← deduct cost
-SaveData.AddCurrency(+coinsReward)   ← add coin reward (if any)
-SaveData.SetFillSlotCount(...)       ← add powerup rewards (if any)
-SaveData.SetRearrangeCount(...)
-SaveData.SetHelicopterCount(...)
-SaveData.Save()                      ← write to JSON on disk
-        ↓
-SaveData.OnDataChanged fires
-        ↓
-GameDataLoader.LoadAllData()         ← HUD coin text auto-updates
-PowerUps.Instance.LoadFromSave()     ← PowerUp HUD counts update
-ShopManager.RefreshAllCards()        ← All card buy buttons enable/disable
-ShopManager.RefreshCoinDisplay()     ← Shop coin text updates
-```
-
----
-
-## 📋 Quick Reference: Example Pack Setups
-
-| Pack Name | Cost | Coins Given | FillSlot | Rearrange | Helicopter |
-|---|---|---|---|---|---|
-| Starter Gold | 30 | 100 | 0 | 0 | 0 |
-| Gold Pack | 50 | 200 | 0 | 0 | 0 |
-| Mega Pack | 100 | 100 | 1 | 1 | 0 |
-| Jumbo Mega Pack | 150 | 300 | 2 | 0 | 1 |
-| Diamond Mega Pack | 250 | 500 | 2 | 2 | 1 |
-| FillSlot x3 | 80 | 0 | 3 | 0 | 0 |
-| Rearrange x3 | 80 | 0 | 0 | 3 | 0 |
-| Helicopter x2 | 120 | 0 | 0 | 0 | 2 |
-
-All of these are set purely in the Inspector — **no code changes needed.**
-
----
-
-## ✅ Checklist Before Testing
-
-- [ ] Created `Assets/Script/Shop/ShopManager.cs` and pasted Script 1
-- [ ] Created `Assets/Script/Shop/ShopItemCard.cs` and pasted Script 2
-- [ ] `ShopManager` GameObject exists inside Canvas/ShopPopup
-- [ ] `coinCountText` reference is assigned in `ShopManager` Inspector
-- [ ] Each card has `ShopItemCard.cs` attached
-- [ ] Each card's `buyButton`, `costText`, `rewardDescriptionText` are assigned in Inspector
-- [ ] Each card has `coinCost`, `coinsReward`, `powerupRewards` set in Inspector
-- [ ] A button calls `ShopManager.Instance.OpenShop()` or `ShopPopup.ShowShopPopup()`
-- [ ] `UIPopupManager` has `Shop` type registered with your ShopPopup UIBase
-
----
-
-## 🧩 Compatibility Notes
-
-| Your Script | Compatible? | Notes |
-|---|---|---|
-| `SaveData.cs` | ✅ 100% | Uses `AddCurrency`, `SetFillSlotCount`, `SetRearrangeCount`, `SetHelicopterCount`, `Save()` — all existing methods |
-| `GameDataLoader.cs` | ✅ Auto | Listens to `SaveData.OnDataChanged` already — will auto-refresh |
-| `PowerUps.cs` | ✅ Auto | `LoadFromSave()` called after every purchase |
-| `ShopPopup.cs` | ✅ Works alongside | Keep existing open/close or call `ShopManager` methods |
-| `UIPopupManager.cs` | ✅ | Shop type already registered in your enum |
-| `DG.Tweening` | ✅ | Used for shake feedback — already in your project |
-| `SoundManager.cs` | ✅ | Click/PopupOpen/PopupClose sounds used |
-
----
-
-## 💡 Pro Tips
-
-1. **Want to add a new pack?** Just drop a new card GameObject into the Content, attach `ShopItemCard.cs`, fill the Inspector. Done. No ShopManager code changes ever needed.
-
-2. **Want to disable a card temporarily?** Uncheck `GameObject.SetActive(false)` — cards auto-unregister from ShopManager on `OnDisable`.
-
-3. **Want to show "SOLD OUT" or limit purchases?** Add a `public int maxPurchaseCount = -1;` field to `ShopItemCard` and a `private int purchasesDone` counter that checks against it in `OnBuyClicked`. Optionally save that count per item to `SaveData`.
-
-4. **Want animated coin fly-out?** In `ShopManager.TryPurchase()`, after `SaveData.Instance.Save()`, start a coroutine that spawns coin UI objects flying toward the coin counter — purely cosmetic.
-
-5. **Want sale prices?** Add `public int salePrice = -1;` to `ShopItemCard` and in `RefreshUI()` use `salePrice >= 0 ? salePrice : coinCost` for the effective cost.
