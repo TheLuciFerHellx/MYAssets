@@ -1,933 +1,138 @@
-using UnityEngine;
-
-public class SafeAreaHandler : MonoBehaviour
-{
-    RectTransform rectTransform;
-
-    void Start()
-    {
-        rectTransform = GetComponent<RectTransform>();
-        ApplySafeArea();
-    }
-
-    void ApplySafeArea()
-    {
-        Rect safeArea = Screen.safeArea;
-
-        Vector2 minAnchor = safeArea.position;
-        Vector2 maxAnchor = safeArea.position + safeArea.size;
-
-        minAnchor.x /= Screen.width;
-        minAnchor.y /= Screen.height;
-        maxAnchor.x /= Screen.width;
-        maxAnchor.y /= Screen.height;
-
-        rectTransform.anchorMin = minAnchor;
-        rectTransform.anchorMax = maxAnchor;
-    }
-}
-
-
-===================================================================
-
-using UnityEngine;
-using UnityEngine.UI;
-
-public class FakeLoader : MonoBehaviour
-{
-    public Image fillBar;
-    public RectTransform car;
-    public RectTransform passenger;
-    public Text percentText;
-
-    public float speed = 0.3f;
-
-    private float progress = 0f;
-    private float barWidth;
-
-    void Start()
-    {
-        barWidth = ((RectTransform)fillBar.transform).rect.width;
-    }
-
-    void Update()
-    {
-        if (progress >= 1f) return;
-
-        // Progress increase
-        progress += Time.deltaTime * speed;
-        progress = Mathf.Clamp01(progress);
-
-        // Fill bar
-        fillBar.fillAmount = progress;
-
-        // Car position
-        float xPos = progress * barWidth;
-
-        // Small bounce for car
-        float bounce = Mathf.Sin(Time.time * 10f) * 5f;
-        car.anchoredPosition = new Vector2(xPos, bounce);
-
-        // Passenger follow (normal)
-        float followOffset = 60f;
-        Vector2 targetPos = new Vector2(xPos - followOffset, 0);
-
-        // Funny catch near end 😄
-        if (progress > 0.9f)
-        {
-            targetPos = Vector2.Lerp(
-                passenger.anchoredPosition,
-                car.anchoredPosition - new Vector2(30, 0),
-                Time.deltaTime * 5f
-            );
-        }
-
-        // Add small shake for running feel
-        float shake = Mathf.Sin(Time.time * 15f) * 3f;
-        passenger.anchoredPosition = new Vector2(targetPos.x, shake);
-
-        // Percent text
-        percentText.text = Mathf.RoundToInt(progress * 100) + "%";
-
-        // DONE ✅
-        if (progress >= 1f)
-        {
-            OnLoadingComplete();
-        }
-    }
-
-    void OnLoadingComplete()
-    {
-        percentText.text = "100%";
-
-        // Disable loader after short delay
-        Invoke(nameof(HideLoader), 0.5f);
-    }
-
-    void HideLoader()
-    {
-        gameObject.SetActive(false); // hides whole loading UI
-    }
-}
-
-=============================================UI========================================================
-
-Below is a professional AAA-style master prompt you can paste into:
-
-* Midjourney
-* ChatGPT image generation
-* Leonardo AI
-* Krea
-* Recraft
-* Figma AI
-* Sora image tools
-* UIzard
-* Stable Diffusion
-* any game asset AI
-
-This is designed specifically for:
-
-* Unity mobile game
-* puzzle parking jam game
-* export-ready UI
-* professional stylized casual game look
-* polished like top mobile studios
+Here’s your **final clean prompt for Antigravity**, optimized specifically for **Android performance + edge cases + zero architecture changes**:
 
 ---
 
-# MASTER ART DIRECTION (USE FIRST)
+## ✅ UNITY ANDROID PERFORMANCE + STABILITY AUDIT PROMPT (FINAL)
 
-Create a complete AAA-quality mobile game UI kit for a stylized casual puzzle game about cars escaping parking traffic jams.
+**PROMPT:**
 
-Art direction:
+==================================================================================================================
 
-* modern casual mobile game
-* premium polished AAA mobile studio quality
-* highly readable
-* playful but elegant
-* stylized toy-like visuals
-* smooth rounded shapes
-* clean spacing
-* satisfying visual hierarchy
-* colorful but not oversaturated
-* no cheap AI look
-* no generic hypercasual appearance
-* professionally art-directed
+You are a senior Unity mobile performance engineer and QA specialist.
 
-Visual style:
-
-* blend of Dream Games, Peak Games, King, Rollic, and modern Match-3 mobile UI quality
-* soft gradients
-* rounded corners
-* layered cards
-* subtle shadows
-* glossy highlights
-* depth using ambient occlusion
-* soft bloom lighting
-* smooth edge highlights
-* premium mobile UX
-
-Color palette:
-Primary Blue: #4D7CFE
-Accent Orange: #FFB84D
-Accent Red: #FF6B6B
-Success Green: #63D471
-Background: #F4F6FB
-Dark Text: #1F2937
-White Panels: #FFFFFF
-
-Mood:
-
-* satisfying
-* rewarding
-* addictive
-* premium
-* toy-like
-* modern
-* clean
-
-UI requirements:
-
-* export-ready PNG assets
-* transparent background
-* no mockup phones
-* no background scene
-* separate layered assets
-* sprite-sheet ready
-* Unity-ready
-* mobile portrait orientation
-* high resolution 4K quality
-* anti-aliased clean edges
-* consistent icon language
-* consistent padding and spacing
-* no blurry details
-* no watermark
-* no text artifacts
-
-Create all UI in a unified style system.
+My project is a near-finished Unity Android game. I only want performance optimization and stability fixes.
 
 ---
 
-# SPLASH SCREEN PROMPT
+## 🎯 MAIN GOAL:
 
-Design a premium mobile game splash screen for a stylized car parking puzzle game.
+Make the game run:
 
-Include:
-
-* centered GB logo
-* glowing loading bar
-* subtle animated light streaks
-* soft gradient background
-* modern toy-like style
-* premium game studio feel
-
-Style:
-
-* minimal but cinematic
-* rounded visuals
-* subtle floating particles
-* blue and orange lighting accents
-* premium polished loading experience
-
-Export:
-
-* transparent logo PNG
-* separate loading bar sprite
-* layered assets for Unity
-* no background baked into UI
+* Stable 60 FPS on mid-range Android devices
+* No stutters or GC spikes
+* No crashes or runtime errors
 
 ---
 
-# MAIN MENU PROMPT
+## 🚫 STRICT RULES:
 
-Create a AAA-quality main menu UI screen for a stylized mobile parking jam puzzle game.
-
-Layout:
-Top Area:
-
-* profile button
-* coin counter
-* settings button
-
-Middle:
-
-* giant Play button
-* premium glossy style
-* satisfying toy-like button
-
-Side Buttons:
-
-* shop
-* daily rewards
-
-Visual Style:
-
-* floating cards
-* rounded UI panels
-* layered shadows
-* soft gradients
-* subtle glow effects
-* modern mobile casual game aesthetic
-
-Buttons should feel:
-
-* tactile
-* juicy
-* rewarding to tap
-
-Design references:
-
-* Royal Match
-* Monopoly GO
-* Match Factory
-* Parking Jam 3D
-
-Export requirements:
-
-* all buttons separate PNG
-* transparent backgrounds
-* sliced UI sprites
-* Unity 9-slice compatible
+* Do NOT redesign architecture
+* Do NOT rewrite systems
+* Do NOT add new features
+* Do NOT refactor unless absolutely necessary
+* Only suggest minimal safe changes
 
 ---
 
-# PROFILE SCREEN PROMPT
+## 1. PERFORMANCE AUDIT (ANDROID FOCUS)
 
-Create a premium stylized player profile UI screen for a casual mobile puzzle game.
+Analyze all scripts and identify:
 
-Include:
+* CPU-heavy operations in `Update()` / `FixedUpdate()`
+* Garbage Collection (GC) allocations
+* Object pooling issues (Instantiate/Destroy abuse)
+* Physics inefficiencies (raycasts, collisions, rigidbodies)
+* Animator / VFX / audio performance issues
+* UI update inefficiencies (layout rebuilds, text updates)
+* Overuse of `GetComponent`, `FindObjectOfType`
+* Memory leaks or persistent references
 
-* large rounded player avatar
-* editable player name
-* stat cards
+For each issue:
 
-Stats:
-
-* total games played
-* streak
-* max win ratio
-* total medals
-
-Bottom Area:
-
-* horizontal profile avatar selection slider
-* toy-like rounded avatar frames
-* premium glowing selection state
-
-Style:
-
-* soft white cards
-* elegant gradients
-* satisfying shadows
-* modern casual mobile game design
-* playful but clean
-
-Export:
-
-* avatar frames separate
-* stat cards separate
-* transparent PNG
-* sprite-sheet optimized
+* Explain why it hurts Android performance
+* Estimate FPS impact
+* Provide ONLY minimal fix (small change only)
 
 ---
 
-# SHOP SCREEN PROMPT
+## 2. ANDROID EDGE CASES (CRITICAL)
 
-Create a premium mobile game shop UI for a stylized parking puzzle game.
+Find all possible runtime issues:
 
-Layout:
+* NullReferenceException risks
+* Missing inspector references
+* Save/load corruption or data loss
+* Input spam or double trigger bugs (touch input)
+* Scene reload or pause/resume issues (Android lifecycle)
+* App background/foreground state bugs
+* Device overheating / throttling risks
+* Low memory device crash risks
 
-* grid-based item cards
-* bundles
-* coin packs
-* powerups
-* premium offers
+For each:
 
-Card Design:
-
-* glossy
-* rounded corners
-* layered depth
-* shiny highlights
-* premium mobile economy style
-
-Include:
-
-* coins icon
-* boosters
-* rarity glow colors
-* purchase buttons
-
-Visual Quality:
-
-* AAA mobile studio quality
-* no clutter
-* polished economy UI
-
-Export:
-
-* separate item cards
-* transparent background
-* Unity-ready sliced sprites
+* Describe scenario
+* What breaks
+* Minimal safe fix (guard clause or small fix only)
 
 ---
 
-# DAILY REWARD SCREEN PROMPT
+## 3. FPS OPTIMIZATION TARGET
 
-Create a stunning 7-day reward UI for a stylized mobile parking puzzle game.
+Assume target:
 
-Layout:
+* Stable 60 FPS on mid-range Android devices
 
-* 7 reward boxes
-* progression flow
-* current day highlighted
-* premium reward shine effects
+List:
 
-Style:
-
-* satisfying collectible feel
-* toy-like polished visuals
-* modern casual game style
-* glowing reward states
-* soft gradients
-* rounded reward cards
-
-Include:
-
-* lock states
-* claimed states
-* active reward animation look
-
-Export:
-
-* each reward box separate
-* transparent PNG
-* sprite-sheet ready
+* Top 5 biggest performance bottlenecks
+* What to fix first (priority order)
+* Expected FPS improvement after fixes
 
 ---
 
-# SETTINGS SCREEN PROMPT
+## 4. SAFE FIX POLICY
 
-Create a clean premium settings popup for a casual mobile puzzle game.
+Only suggest:
 
-Include:
-
-* sound toggle
-* music toggle
-* haptics toggle
-
-Style:
-
-* rounded toggle switches
-* soft lighting
-* modern minimal UI
-* elegant shadows
-* premium polished mobile style
-
-Popup Design:
-
-* floating card
-* blurred soft background feel
-* smooth rounded corners
-
-Export:
-
-* separate toggle states
-* transparent PNG
+* caching values
+* removing redundant calls
+* adding null checks
+* reducing per-frame work
+* pooling suggestions ONLY if critical
+* small code edits, NOT rewrites
 
 ---
 
-# GAMEPLAY HUD PROMPT
+## 5. OUTPUT FORMAT (STRICT)
 
-Create a premium gameplay HUD for a stylized parking jam mobile game.
+For every issue:
 
-Top HUD:
+### Issue Title
 
-* coin counter
-* current level
-* pause/play button
-
-Bottom HUD:
-
-* 3 powerup cards
-* small rounded premium cards
-* toy-like design
-* glossy effects
-
-Style:
-
-* minimal gameplay distraction
-* highly readable
-* premium mobile UX
-* floating UI feel
-* subtle depth shadows
-
-Export:
-
-* all HUD elements separate
-* transparent PNG
-* sprite sheet optimized
+* Location:
+* Problem:
+* Why it hurts Android performance:
+* Risk level (Low / Medium / High):
+* Minimal fix:
+* Explanation:
 
 ---
 
-# GAME OVER POPUP PROMPT
+## 6. FINAL SUMMARY
 
-Create a premium game over popup for a stylized casual mobile puzzle game.
-
-Include:
-
-* sad emoji
-* Game Over title
-* Try Again button
-
-Style:
-
-* rounded popup card
-* polished shadows
-* emotional but playful
-* soft red accent lighting
-* premium mobile game feel
-
-Button:
-
-* large juicy retry button
-* satisfying tap style
-
-Export:
-
-* popup background separate
-* emoji separate
-* button separate
-* transparent PNG
+* Estimated FPS gain
+* Stability improvement rating
+* Top 10 urgent fixes list for Android release
 
 ---
 
-# LEVEL COMPLETE POPUP PROMPT
+## INPUT:
 
-Create an exciting level complete popup for a premium mobile parking puzzle game.
+Here is my Unity project code and structure:
 
-Include:
-
-* Level Complete title
-* reward coins
-* collect button
-* celebratory effects
-
-Style:
-
-* victory atmosphere
-* gold glow
-* premium reward visuals
-* polished casual game style
-* confetti-inspired highlights
-
-Button:
-
-* juicy collect button
-* satisfying premium look
-
-Export:
-
-* separate popup assets
-* transparent PNG
-* sprite-sheet ready
+==================================================================================================================
+[PASTE PROJECT HERE]
 
 ---
 
-# PAUSE POPUP PROMPT
-
-Create a minimal premium pause popup for a casual mobile puzzle game.
-
-Include:
-
-* Resume button
-* Exit button
-
-Style:
-
-* clean
-* elegant
-* rounded floating card
-* modern casual mobile design
-
-Export:
-
-* separate buttons
-* transparent PNG
-
----
-
-# SPRITE SHEET EXPORT PROMPT
-
-Export all UI assets as:
-
-* transparent PNG
-* no background
-* sprite-sheet optimized
-* 4096x4096 sprite atlas
-* separate layers
-* Unity-ready
-* clean alpha edges
-* no compression artifacts
-* consistent padding
-* power-of-two texture sizes
-
-Requirements:
-
-* compatible with Unity UI Image component
-* compatible with 9-slicing
-* mobile optimized
-* maintain high readability on small screens
-* export normal + pressed button states
-* export hover glow states
-* export icons separately
-
----
-
-# UNITY IMPORT SETTINGS GUIDE
-
-Use these settings in Unity:
-
-## Texture Settings
-
-* Texture Type → Sprite (2D and UI)
-* Compression → None
-* Filter Mode → Bilinear
-* Max Size → 4096
-* Mesh Type → Full Rect
-
-## Canvas
-
-* Canvas Scaler → Scale With Screen Size
-* Reference Resolution → 1080 x 1920
-* Match → 0.5
-
-## Best UI Setup
-
-Use:
-
-* TextMeshPro
-* DOTween animations
-* soft shadows
-* button scale animation
-
----
-
-# BEST FONT COMBINATION
-
-Use:
-
-* Poppins Bold
-* Nunito ExtraBold
-* Fredoka SemiBold
-
----
-
-# FINAL IMPORTANT STYLE RULE
-
-Add this at the END of every AI prompt:
-
-Avoid:
-
-* generic AI style
-* flat boring UI
-* low quality gradients
-* ugly outlines
-* inconsistent spacing
-* blurry icons
-* hypercasual cheap look
-* overcomplicated design
-* realism
-
-Target:
-AAA mobile game studio quality UI designed by senior art directors from top-grossing mobile puzzle games.
-
-==================SHOP====================
-
-using System.Collections.Generic;
-using UnityEngine;
-using TMPro;
-
-public class ShopManager : MonoBehaviour
-{
-    public static ShopManager Instance;
-
-    public TextMeshProUGUI coinCountText;
-
-    private List<ShopItemCard> registeredCards = new List<ShopItemCard>();
-
-    private bool isProcessingPurchase;
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-    }
-
-    private void OnEnable()
-    {
-        SaveData.OnDataChanged += OnSaveChanged;
-    }
-
-    private void OnDisable()
-    {
-        SaveData.OnDataChanged -= OnSaveChanged;
-    }
-
-    private void Start()
-    {
-        RefreshAllUI();
-    }
-
-    private void OnSaveChanged()
-    {
-        // RefreshAllUI();
-         StartCoroutine(RefreshNextFrame());
-    }
-
-    // ---------- REGISTER ----------
-    public void RegisterCard(ShopItemCard card)
-    {
-        if (card != null && !registeredCards.Contains(card))
-            registeredCards.Add(card);
-    }
-
-    public void UnregisterCard(ShopItemCard card)
-    {
-        if (card != null)
-            registeredCards.Remove(card);
-    }
-
-    // ---------- UI ----------
-    private void RefreshAllUI()
-    {
-        RefreshCoinDisplay();
-        RefreshAllCards();
-    }
-    private System.Collections.IEnumerator RefreshNextFrame()
-    {
-        yield return null; // wait 1 frame
-
-        RefreshCoinDisplay();
-        RefreshAllCards();
-    }
-
-    public void RefreshCoinDisplay()
-    {
-        if (coinCountText == null) return;
-        if (SaveData.Instance?.CurrentSave == null) return;
-
-        coinCountText.text = SaveData.Instance.CurrentSave.currency.ToString();
-    }
-
-    public void RefreshAllCards()
-    {
-        for (int i = registeredCards.Count - 1; i >= 0; i--)
-        {
-            if (registeredCards[i] == null)
-            {
-                registeredCards.RemoveAt(i);
-                continue;
-            }
-
-            registeredCards[i].RefreshUI();
-        }
-    }
-
-    // ---------- PURCHASE ----------
-    public bool TryPurchase(ShopItemCard card)
-    {
-        if (card == null || SaveData.Instance?.CurrentSave == null)
-            return false;
-
-        if (isProcessingPurchase)
-            return false;
-
-        int currentCoins = SaveData.Instance.CurrentSave.currency;
-        int cost = card.coinCost;
-
-        // ❌ EARLY EXIT BEFORE LOCK
-        if (currentCoins < cost)
-        {
-            card.PlayInsufficientFeedback();
-            return false;
-        }
-
-        isProcessingPurchase = true;
-
-        try
-        {
-            // ✅ SINGLE SOURCE OF TRUTH UPDATE
-            SaveData.Instance.CurrentSave.currency =
-                currentCoins - cost + card.coinsReward;
-
-            // POWERUPS
-            if (card.powerupRewards != null)
-            {
-                foreach (var reward in card.powerupRewards)
-                {
-                    if (reward == null) continue;
-
-                    switch (reward.powerupType)
-                    {
-                        case ShopItemCard.PowerupType.FillSlot:
-                            SaveData.Instance.CurrentSave.fillSlotCount += reward.amount;
-                            break;
-
-                        case ShopItemCard.PowerupType.Rearrange:
-                            SaveData.Instance.CurrentSave.rearrangeCount += reward.amount;
-                            break;
-
-                        case ShopItemCard.PowerupType.Helicopter:
-                            SaveData.Instance.CurrentSave.helicopterCount += reward.amount;
-                            break;
-                    }
-                }
-            }
-
-            // SAVE ONCE
-            SaveData.Instance.Save();
-
-            // IMPORTANT: trigger global refresh
-            
-
-            if (PowerUps.Instance != null)
-                PowerUps.Instance.LoadFromSave();
-
-            Debug.Log("PURCHASE SUCCESS: " + card.itemName);
-        }
-        finally
-        {
-            isProcessingPurchase = false;
-        }
-
-        return true;
-    }
-}
-
-----------------------------------------
-
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
-using DG.Tweening;
-
-public class ShopItemCard : MonoBehaviour
-{
-    public enum PowerupType
-    {
-        FillSlot,
-        Rearrange,
-        Helicopter
-    }
-
-    [System.Serializable]
-    public class PowerupReward
-    {
-        public PowerupType powerupType;
-        public int amount = 1;
-    }
-
-    [Header("DATA")]
-    public string itemName;
-    public int coinCost;
-    public int coinsReward;
-    public List<PowerupReward> powerupRewards;
-
-    [Header("UI")]
-    public Button buyButton;
-    public TextMeshProUGUI costText;
-    public TextMeshProUGUI rewardDescriptionText;
-    public TextMeshProUGUI itemNameText;
-
-    private bool initialized;
-
-    private void Awake()
-    {
-        if (initialized) return;
-        initialized = true;
-
-        if (buyButton != null)
-        {
-            buyButton.onClick.RemoveAllListeners();
-            buyButton.onClick.AddListener(OnBuyClicked);
-        }
-    }
-
-    private void Start()
-    {
-        ShopManager.Instance?.RegisterCard(this);
-        RefreshUI();
-    }
-
-    private void OnDestroy()
-    {
-        ShopManager.Instance?.UnregisterCard(this);
-    }
-
-    public void OnBuyClicked()
-    {
-        ShopManager.Instance?.TryPurchase(this);
-    }
-
-    public void RefreshUI()
-    {
-        if (SaveData.Instance?.CurrentSave == null) return;
-
-        if (itemNameText != null)
-            itemNameText.text = itemName;
-
-        if (costText != null)
-            costText.text = "Rs. " + coinCost;
-
-        if (rewardDescriptionText != null)
-            rewardDescriptionText.text = BuildRewardText();
-
-        if (buyButton != null)
-            buyButton.interactable =
-                SaveData.Instance.CurrentSave.currency >= coinCost;
-    }
-
-    private string BuildRewardText()
-    {
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-
-        if (coinsReward > 0)
-            sb.Append("+" + coinsReward + " Coins");
-
-        if (powerupRewards != null)
-        {
-            foreach (var r in powerupRewards)
-            {
-                sb.AppendLine();
-
-                switch (r.powerupType)
-                {
-                    case PowerupType.FillSlot:
-                        sb.Append("+" + r.amount + " Fill Slot");
-                        break;
-
-                    case PowerupType.Rearrange:
-                        sb.Append("+" + r.amount + " Rearrange");
-                        break;
-
-                    case PowerupType.Helicopter:
-                        sb.Append("+" + r.amount + " Helicopter");
-                        break;
-                }
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    public void PlayInsufficientFeedback()
-    {
-        transform.DOShakePosition(0.3f, 10f);
-    }
-}
+If you want, I can also make you a **“Play Store release checklist prompt”** so your game passes real-world Android testing (low-end devices, battery, heating, etc.).
